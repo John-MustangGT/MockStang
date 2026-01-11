@@ -3,6 +3,7 @@
 #include "elm327_protocol.h"
 #include "pid_handler.h"
 #include "web_server.h"
+#include "config_manager.h"
 
 // ELM327 TCP Server
 WiFiServer elm327Server(ELM327_PORT);
@@ -12,6 +13,7 @@ WiFiClient elm327Client;
 ELM327Protocol elm327;
 PIDHandler* pidHandler;
 WebServer* webServer;
+ConfigManager* configManager;
 
 // Client connection state
 bool clientConnected = false;
@@ -25,31 +27,55 @@ void setup() {
     Serial.println("MockStang - WiFi OBD-II Emulator");
     Serial.println("=================================\n");
 
+    // Load configuration from EEPROM
+    configManager = new ConfigManager();
+    configManager->load();
+
     // Initialize handlers
     pidHandler = new PIDHandler(&elm327);
-    webServer = new WebServer(pidHandler);
+    webServer = new WebServer(pidHandler, configManager);
 
-    // Generate SSID from MAC address (iCAR_PRO_XXXX format)
+    // Apply default PID values from config
+    pidHandler->updateRPM(configManager->getDefaultRPM());
+    pidHandler->updateSpeed(configManager->getDefaultSpeed());
+    pidHandler->updateCoolantTemp(configManager->getDefaultCoolantTemp());
+    pidHandler->updateIntakeTemp(configManager->getDefaultIntakeTemp());
+    pidHandler->updateThrottle(configManager->getDefaultThrottle());
+    pidHandler->updateMAF(configManager->getDefaultMAF());
+    pidHandler->updateFuelLevel(configManager->getDefaultFuelLevel());
+    pidHandler->updateBarometric(configManager->getDefaultBarometric());
+
+    // Generate SSID (either custom or MAC-based)
     WiFi.mode(WIFI_AP);
     uint8_t mac[6];
     WiFi.softAPmacAddress(mac);
-    char ssid[20];
-    sprintf(ssid, "%s%02X%02X", WIFI_SSID_PREFIX, mac[4], mac[5]);
+    char ssid[32];
 
-    // Configure WiFi Access Point with custom IP
+    if (configManager->getUseCustomSSID() && strlen(configManager->getSSID()) > 0) {
+        strncpy(ssid, configManager->getSSID(), 31);
+        ssid[31] = 0;
+    } else {
+        sprintf(ssid, "%s%02X%02X", WIFI_SSID_PREFIX, mac[4], mac[5]);
+    }
+
+    // Get password from config
+    const char* password = configManager->getUsePassword() ? configManager->getPassword() : "";
+
+    // Configure WiFi Access Point with custom IP from config
     Serial.printf("Configuring Access Point: %s\n", ssid);
-    WiFi.softAPConfig(AP_IP_ADDRESS, AP_GATEWAY, AP_SUBNET);
-    WiFi.softAP(ssid, WIFI_PASSWORD, WIFI_CHANNEL, false, MAX_CONNECTIONS);
+    WiFi.softAPConfig(configManager->getIP(), configManager->getGateway(), configManager->getSubnet());
+    WiFi.softAP(ssid, password, WIFI_CHANNEL, false, MAX_CONNECTIONS);
 
     IPAddress IP = WiFi.softAPIP();
     Serial.printf("AP IP address: %s\n", IP.toString().c_str());
-    if (strlen(WIFI_PASSWORD) > 0) {
-        Serial.printf("AP Password: %s\n", WIFI_PASSWORD);
+    if (strlen(password) > 0) {
+        Serial.printf("AP Password: %s\n", password);
     } else {
         Serial.println("AP Password: (none - open network)");
     }
     Serial.printf("AP MAC: %02X:%02X:%02X:%02X:%02X:%02X\n",
                   mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+    Serial.printf("VIN: %s\n", configManager->getVIN());
 
     // Start ELM327 server
     elm327Server.begin();

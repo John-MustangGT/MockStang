@@ -5,10 +5,12 @@ A WiFi-based OBD-II adapter emulator for ESP-01S that mimics the vGate iCar Pro 
 ## Features
 
 - **ELM327 v1.5 Protocol Emulation** - Full AT command support
-- **WiFi Access Point Mode** - Emulates vGate iCar 3 WiFi adapter
+- **WiFi Access Point Mode** - Emulates vGate iCar Pro WiFi adapter
 - **Real-time Web Dashboard** - Monitor and control mock data via browser
 - **WebSocket Updates** - Live command/response monitoring
 - **Adjustable PIDs** - Modify car parameters on-the-fly with sliders
+- **Persistent Configuration** - EEPROM-based settings storage
+- **Web-Based Settings** - Configure network, VIN, and defaults via browser
 - **Optimized for ESP-01S** - Runs on 1MB flash with ~50KB RAM
 
 ## Hardware Requirements
@@ -77,7 +79,23 @@ A WiFi-based OBD-II adapter emulator for ESP-01S that mimics the vGate iCar Pro 
 
 ## Configuration
 
-Edit `include/config.h` to customize:
+MockStang supports both compile-time and runtime configuration:
+
+### Runtime Configuration (Recommended)
+
+Access the **Settings page** via the web dashboard to configure:
+- Custom SSID or use auto-generated iCAR_PRO_XXXX format
+- WiFi password (optional)
+- IP address, subnet, and gateway
+- Vehicle VIN (for OBD-II mode 09 requests)
+- Device ID (returned by AT@1 command)
+- Default PID values (RPM, speed, temps, etc.)
+
+Settings are **saved to EEPROM** and persist across reboots. Click the ⚙️ Settings button on the dashboard to access configuration.
+
+### Compile-Time Configuration
+
+Edit `include/config.h` to change defaults:
 
 ```cpp
 #define WIFI_SSID_PREFIX "iCAR_PRO_"    // SSID prefix (MAC-based suffix added automatically)
@@ -87,7 +105,7 @@ Edit `include/config.h` to customize:
 #define WEB_SERVER_PORT 80              // Web dashboard port
 ```
 
-Default car state values can also be adjusted in `config.h`.
+**Note:** Runtime configuration (via web interface) overrides compile-time defaults.
 
 ## Usage
 
@@ -117,6 +135,7 @@ The dashboard allows you to:
 - Adjust car parameters (RPM, speed, temperature, etc.)
 - Reset runtime counter
 - View command/response log
+- Access Settings page to configure MockStang
 
 ### 4. Connect Your OBD-II App
 
@@ -125,6 +144,17 @@ Configure your OBD-II application:
 - **IP Address**: 192.168.0.10
 - **Port**: 35000
 - **Protocol**: Auto or ISO 15765-4 (CAN)
+
+### 5. Configure Settings (Optional)
+
+Click the **⚙️ Settings** button on the dashboard to:
+- Customize WiFi SSID and password
+- Change IP address configuration
+- Set your vehicle's VIN
+- Adjust default PID values
+- Factory reset to defaults
+
+All settings are saved to EEPROM and persist across power cycles. **Restart MockStang** after changing network settings for them to take effect.
 
 ## Supported AT Commands
 
@@ -209,11 +239,12 @@ Use the web dashboard sliders to simulate:
 ```
 MockStang/
 ├── include/
-│   ├── config.h              # Configuration and defaults
+│   ├── config.h              # Compile-time configuration and defaults
+│   ├── config_manager.h      # EEPROM-based runtime configuration
 │   ├── elm327_protocol.h     # ELM327 AT command parser
 │   ├── pid_handler.h         # OBD-II PID response engine
 │   ├── web_server.h          # HTTP & WebSocket server
-│   └── web_interface.h       # Embedded HTML/JS dashboard
+│   └── web_interface.h       # Embedded HTML/JS dashboard (main + settings)
 ├── src/
 │   └── mockstang.ino         # Main application
 ├── platformio.ini            # PlatformIO configuration
