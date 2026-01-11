@@ -2,10 +2,16 @@
 #define CONFIG_H
 
 // WiFi AP Configuration
-#define WIFI_SSID "MockStang"
-#define WIFI_PASSWORD "mustang1964"  // vGate iCar 3 typically uses this
+// SSID will be generated as "iCAR_PRO_XXXX" where XXXX = last 2 octets of MAC
+#define WIFI_SSID_PREFIX "iCAR_PRO_"
+#define WIFI_PASSWORD "mustang1964"  // vGate iCar Pro default password
 #define WIFI_CHANNEL 6
 #define MAX_CONNECTIONS 1
+
+// Network Configuration (vGate iCar Pro defaults)
+#define AP_IP_ADDRESS IPAddress(192, 168, 0, 10)
+#define AP_GATEWAY IPAddress(192, 168, 0, 10)
+#define AP_SUBNET IPAddress(255, 255, 255, 0)
 
 // Server Ports
 #define ELM327_PORT 35000

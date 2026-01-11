@@ -29,14 +29,23 @@ void setup() {
     pidHandler = new PIDHandler(&elm327);
     webServer = new WebServer(pidHandler);
 
-    // Configure WiFi Access Point
-    Serial.printf("Configuring Access Point: %s\n", WIFI_SSID);
+    // Generate SSID from MAC address (iCAR_PRO_XXXX format)
     WiFi.mode(WIFI_AP);
-    WiFi.softAP(WIFI_SSID, WIFI_PASSWORD, WIFI_CHANNEL, false, MAX_CONNECTIONS);
+    uint8_t mac[6];
+    WiFi.softAPmacAddress(mac);
+    char ssid[20];
+    sprintf(ssid, "%s%02X%02X", WIFI_SSID_PREFIX, mac[4], mac[5]);
+
+    // Configure WiFi Access Point with custom IP
+    Serial.printf("Configuring Access Point: %s\n", ssid);
+    WiFi.softAPConfig(AP_IP_ADDRESS, AP_GATEWAY, AP_SUBNET);
+    WiFi.softAP(ssid, WIFI_PASSWORD, WIFI_CHANNEL, false, MAX_CONNECTIONS);
 
     IPAddress IP = WiFi.softAPIP();
     Serial.printf("AP IP address: %s\n", IP.toString().c_str());
     Serial.printf("AP Password: %s\n", WIFI_PASSWORD);
+    Serial.printf("AP MAC: %02X:%02X:%02X:%02X:%02X:%02X\n",
+                  mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
 
     // Start ELM327 server
     elm327Server.begin();
@@ -48,7 +57,7 @@ void setup() {
 
     Serial.println("\n=================================");
     Serial.println("System Ready!");
-    Serial.printf("Connect to WiFi: %s\n", WIFI_SSID);
+    Serial.printf("Connect to WiFi: %s\n", ssid);
     Serial.printf("OBD-II Port: %d\n", ELM327_PORT);
     Serial.printf("Web Dashboard: http://%s\n", IP.toString().c_str());
     Serial.println("=================================\n");

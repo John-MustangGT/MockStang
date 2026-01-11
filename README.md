@@ -1,6 +1,6 @@
 # MockStang - WiFi OBD-II Emulator
 
-A WiFi-based OBD-II adapter emulator for ESP-01S that mimics the vGate iCar 3 WiFi adapter. Perfect for developing and testing OBD-II applications like OpenPonyLogger without needing a real vehicle.
+A WiFi-based OBD-II adapter emulator for ESP-01S that mimics the vGate iCar Pro WiFi adapter. Perfect for developing and testing OBD-II applications like OpenPonyLogger without needing a real vehicle.
 
 ## Features
 
@@ -80,8 +80,9 @@ A WiFi-based OBD-II adapter emulator for ESP-01S that mimics the vGate iCar 3 Wi
 Edit `include/config.h` to customize:
 
 ```cpp
-#define WIFI_SSID "MockStang"           // WiFi AP name
+#define WIFI_SSID_PREFIX "iCAR_PRO_"    // SSID prefix (MAC-based suffix added automatically)
 #define WIFI_PASSWORD "mustang1964"     // WiFi password
+#define AP_IP_ADDRESS IPAddress(192, 168, 0, 10)  // vGate iCar Pro default IP
 #define ELM327_PORT 35000               // OBD-II port
 #define WEB_SERVER_PORT 80              // Web dashboard port
 ```
@@ -93,21 +94,22 @@ Default car state values can also be adjusted in `config.h`.
 ### 1. Power Up the ESP-01S
 
 After uploading, the ESP-01S will:
-- Create a WiFi Access Point named **"MockStang"**
+- Create a WiFi Access Point named **"iCAR_PRO_XXXX"** (where XXXX = last 2 MAC octets)
+- Use IP address **192.168.0.10**
 - Start ELM327 server on port **35000**
 - Start web server on port **80**
 
 ### 2. Connect to WiFi
 
 On your phone/tablet/computer:
-- Connect to WiFi network: **MockStang**
+- Connect to WiFi network: **iCAR_PRO_XXXX** (check serial monitor for exact name)
 - Password: **mustang1964**
 
 ### 3. Access Web Dashboard
 
 Open a browser and navigate to:
 ```
-http://192.168.4.1
+http://192.168.0.10
 ```
 
 The dashboard allows you to:
@@ -120,7 +122,7 @@ The dashboard allows you to:
 
 Configure your OBD-II application:
 - **Type**: WiFi adapter
-- **IP Address**: 192.168.4.1
+- **IP Address**: 192.168.0.10
 - **Port**: 35000
 - **Protocol**: Auto or ISO 15765-4 (CAN)
 
@@ -162,16 +164,18 @@ Example output:
 MockStang - WiFi OBD-II Emulator
 =================================
 
-Configuring Access Point: MockStang
-AP IP address: 192.168.4.1
+Configuring Access Point: iCAR_PRO_A1B2
+AP IP address: 192.168.0.10
+AP Password: mustang1964
+AP MAC: DE:AD:BE:EF:A1:B2
 ELM327 server listening on port 35000
 Web server started on port 80
 
 =================================
 System Ready!
-Connect to WiFi: MockStang
+Connect to WiFi: iCAR_PRO_A1B2
 OBD-II Port: 35000
-Web Dashboard: http://192.168.4.1
+Web Dashboard: http://192.168.0.10
 =================================
 ```
 
@@ -180,15 +184,16 @@ Web Dashboard: http://192.168.4.1
 ### Testing with OpenPonyLogger
 
 1. Power up MockStang
-2. Connect phone to "MockStang" WiFi
-3. Open OpenPonyLogger
-4. Configure connection:
+2. Check serial monitor for WiFi name (e.g., "iCAR_PRO_A1B2")
+3. Connect phone to "iCAR_PRO_XXXX" WiFi (password: mustang1964)
+4. Open OpenPonyLogger
+5. Configure connection:
    - Type: WiFi
-   - IP: 192.168.4.1
+   - IP: 192.168.0.10
    - Port: 35000
-5. Open web dashboard on laptop/tablet
-6. Start logging in OpenPonyLogger
-7. Adjust parameters in real-time via dashboard
+6. Open web dashboard on laptop/tablet at http://192.168.0.10
+7. Start logging in OpenPonyLogger
+8. Adjust parameters in real-time via dashboard
 
 ### Simulating Driving Scenarios
 
@@ -227,19 +232,21 @@ The code is optimized for ESP-01S's limited resources:
 ## Troubleshooting
 
 ### Can't connect to WiFi
-- Check SSID and password in config.h
+- Check serial monitor for exact SSID (format: iCAR_PRO_XXXX)
+- Verify password is "mustang1964"
 - Make sure ESP-01S is powered properly (3.3V, adequate current)
 - Try rebooting the ESP-01S
 
 ### OBD app can't connect
-- Verify you're connected to MockStang WiFi
+- Verify you're connected to iCAR_PRO_XXXX WiFi
+- Verify IP is set to 192.168.0.10 (not 192.168.4.1)
 - Check port number (should be 35000)
-- Try pinging 192.168.4.1
+- Try pinging 192.168.0.10
 - Check serial monitor for connection attempts
 
 ### Web dashboard not loading
 - Verify WiFi connection
-- Try http://192.168.4.1 (not https)
+- Try http://192.168.0.10 (not https, not 192.168.4.1)
 - Clear browser cache
 - Check serial monitor for web server status
 
@@ -259,7 +266,7 @@ This project was created for developing OpenPonyLogger. Feel free to submit issu
 
 ## Acknowledgments
 
-- Emulates the vGate iCar 3 WiFi OBD-II adapter
+- Emulates the vGate iCar Pro WiFi OBD-II adapter
 - Compatible with ELM327 v1.5 protocol specification
 - Built for the ESP8266 community
 
