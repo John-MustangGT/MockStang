@@ -81,7 +81,7 @@ Edit `include/config.h` to customize:
 
 ```cpp
 #define WIFI_SSID_PREFIX "iCAR_PRO_"    // SSID prefix (MAC-based suffix added automatically)
-#define WIFI_PASSWORD "mustang1964"     // WiFi password
+#define WIFI_PASSWORD ""                // WiFi password (empty = open network, default for vGate iCar Pro)
 #define AP_IP_ADDRESS IPAddress(192, 168, 0, 10)  // vGate iCar Pro default IP
 #define ELM327_PORT 35000               // OBD-II port
 #define WEB_SERVER_PORT 80              // Web dashboard port
@@ -103,7 +103,7 @@ After uploading, the ESP-01S will:
 
 On your phone/tablet/computer:
 - Connect to WiFi network: **iCAR_PRO_XXXX** (check serial monitor for exact name)
-- Password: **mustang1964**
+- **No password required** (open network, default vGate iCar Pro behavior)
 
 ### 3. Access Web Dashboard
 
@@ -166,7 +166,7 @@ MockStang - WiFi OBD-II Emulator
 
 Configuring Access Point: iCAR_PRO_A1B2
 AP IP address: 192.168.0.10
-AP Password: mustang1964
+AP Password: (none - open network)
 AP MAC: DE:AD:BE:EF:A1:B2
 ELM327 server listening on port 35000
 Web server started on port 80
@@ -185,7 +185,7 @@ Web Dashboard: http://192.168.0.10
 
 1. Power up MockStang
 2. Check serial monitor for WiFi name (e.g., "iCAR_PRO_A1B2")
-3. Connect phone to "iCAR_PRO_XXXX" WiFi (password: mustang1964)
+3. Connect phone to "iCAR_PRO_XXXX" WiFi (no password required)
 4. Open OpenPonyLogger
 5. Configure connection:
    - Type: WiFi
@@ -233,7 +233,7 @@ The code is optimized for ESP-01S's limited resources:
 
 ### Can't connect to WiFi
 - Check serial monitor for exact SSID (format: iCAR_PRO_XXXX)
-- Verify password is "mustang1964"
+- Network is open (no password required)
 - Make sure ESP-01S is powered properly (3.3V, adequate current)
 - Try rebooting the ESP-01S
 

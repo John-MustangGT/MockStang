@@ -4,7 +4,7 @@
 // WiFi AP Configuration
 // SSID will be generated as "iCAR_PRO_XXXX" where XXXX = last 2 octets of MAC
 #define WIFI_SSID_PREFIX "iCAR_PRO_"
-#define WIFI_PASSWORD "mustang1964"  // vGate iCar Pro default password
+#define WIFI_PASSWORD ""  // vGate iCar Pro default: no password (open network)
 #define WIFI_CHANNEL 6
 #define MAX_CONNECTIONS 1
 

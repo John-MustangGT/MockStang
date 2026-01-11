@@ -43,7 +43,11 @@ void setup() {
 
     IPAddress IP = WiFi.softAPIP();
     Serial.printf("AP IP address: %s\n", IP.toString().c_str());
-    Serial.printf("AP Password: %s\n", WIFI_PASSWORD);
+    if (strlen(WIFI_PASSWORD) > 0) {
+        Serial.printf("AP Password: %s\n", WIFI_PASSWORD);
+    } else {
+        Serial.println("AP Password: (none - open network)");
+    }
     Serial.printf("AP MAC: %02X:%02X:%02X:%02X:%02X:%02X\n",
                   mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
 
