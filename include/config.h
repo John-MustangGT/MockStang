@@ -22,6 +22,9 @@
 #define ELM_DEVICE_ID "MockStang ESP-01S"
 #define ELM_VOLTAGE "12.8V"  // Simulated car voltage
 
+// Maximum number of stored DTCs
+#define MAX_DTCS 8
+
 // Default PID Values (adjustable via web interface)
 struct CarState {
     uint16_t rpm;           // 0x0C - Engine RPM
@@ -34,6 +37,11 @@ struct CarState {
     uint16_t mil_distance;  // 0x21 - Distance traveled with MIL on (km)
     uint8_t fuel_level;     // 0x2F - Fuel Tank Level (%)
     uint8_t barometric;     // 0x33 - Barometric Pressure (kPa)
+
+    // MIL and DTC management
+    bool mil_on;            // MIL (Check Engine Light) status
+    uint8_t dtc_count;      // Number of stored DTCs
+    uint16_t dtcs[MAX_DTCS]; // Stored DTCs (P0xxx format as 16-bit values)
 };
 
 // Default car state (typical idle conditions)
@@ -47,7 +55,10 @@ const CarState DEFAULT_CAR_STATE = {
     .runtime = 300,          // 5 minutes
     .mil_distance = 0,       // No codes
     .fuel_level = 75,        // 75% full
-    .barometric = 101        // Sea level pressure
+    .barometric = 101,       // Sea level pressure
+    .mil_on = false,         // MIL off by default
+    .dtc_count = 0,          // No DTCs
+    .dtcs = {0}              // Empty DTC array
 };
 
 // Memory optimization

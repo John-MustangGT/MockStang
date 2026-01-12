@@ -28,6 +28,58 @@ public:
     void updateBarometric(uint8_t baro) { currentState.barometric = baro; }
     void updateMILDistance(uint16_t dist) { currentState.mil_distance = dist; }
 
+    // MIL and DTC management
+    void setMIL(bool on) { currentState.mil_on = on; }
+    bool getMIL() { return currentState.mil_on; }
+
+    // Add a DTC (P0xxx, P2xxx, etc.)
+    bool addDTC(uint16_t dtc) {
+        if (currentState.dtc_count >= MAX_DTCS) return false;
+        // Check if DTC already exists
+        for (uint8_t i = 0; i < currentState.dtc_count; i++) {
+            if (currentState.dtcs[i] == dtc) return false;
+        }
+        currentState.dtcs[currentState.dtc_count++] = dtc;
+        currentState.mil_on = true; // Turn on MIL when DTC added
+        return true;
+    }
+
+    // Remove a specific DTC
+    bool removeDTC(uint16_t dtc) {
+        for (uint8_t i = 0; i < currentState.dtc_count; i++) {
+            if (currentState.dtcs[i] == dtc) {
+                // Shift remaining DTCs down
+                for (uint8_t j = i; j < currentState.dtc_count - 1; j++) {
+                    currentState.dtcs[j] = currentState.dtcs[j + 1];
+                }
+                currentState.dtc_count--;
+                if (currentState.dtc_count == 0) {
+                    currentState.mil_on = false; // Turn off MIL when no DTCs
+                }
+                return true;
+            }
+        }
+        return false;
+    }
+
+    // Clear all DTCs
+    void clearDTCs() {
+        currentState.dtc_count = 0;
+        currentState.mil_on = false;
+        currentState.mil_distance = 0;
+        for (uint8_t i = 0; i < MAX_DTCS; i++) {
+            currentState.dtcs[i] = 0;
+        }
+    }
+
+    uint8_t getDTCCount() { return currentState.dtc_count; }
+    uint16_t getDTC(uint8_t index) {
+        if (index < currentState.dtc_count) {
+            return currentState.dtcs[index];
+        }
+        return 0;
+    }
+
     // Get current car state (for web interface)
     CarState getState() { return currentState; }
 
@@ -58,14 +110,18 @@ public:
                 dataLen = 4;
                 break;
 
-            case 0x01:  // Monitor status since DTCs cleared
-                // MIL off, 0 DTCs, tests available/complete
-                data[0] = 0x00;  // MIL off, 0 DTCs
+            case 0x01: {  // Monitor status since DTCs cleared
+                // Byte A: MIL status and DTC count
+                // Bit 7: MIL status (0=off, 1=on)
+                // Bits 6-0: Number of DTCs (0-127)
+                uint8_t dtcCount = currentState.dtc_count > 127 ? 127 : currentState.dtc_count;
+                data[0] = (currentState.mil_on ? 0x80 : 0x00) | dtcCount;
                 data[1] = 0x07;  // Test available flags
                 data[2] = 0x65;  // Test complete flags
                 data[3] = 0x04;  // Additional flags
                 dataLen = 4;
                 break;
+            }
 
             case 0x03:  // Fuel system status
                 // Closed loop, using O2 sensor
@@ -165,6 +221,47 @@ public:
     }
 
     // Handle OBD request string (e.g., "01 0C" for RPM)
+    // Handle OBD-II mode 03 request (read DTCs)
+    String handleMode03() {
+        if (currentState.dtc_count == 0) {
+            return "NO DATA\r\r>";
+        }
+
+        String response = "";
+        char buf[8];
+
+        // First byte: number of DTCs
+        sprintf(buf, "%02X", currentState.dtc_count);
+        response += buf;
+
+        // Return all DTCs (2 bytes each)
+        for (uint8_t i = 0; i < currentState.dtc_count; i++) {
+            uint16_t dtc = currentState.dtcs[i];
+            if (elm->getSpaces()) response += " ";
+            sprintf(buf, "%02X", (dtc >> 8) & 0xFF);
+            response += buf;
+            if (elm->getSpaces()) response += " ";
+            sprintf(buf, "%02X", dtc & 0xFF);
+            response += buf;
+        }
+
+        response += "\r\r>";
+        return response;
+    }
+
+    // Handle OBD-II mode 04 request (clear DTCs)
+    String handleMode04() {
+        clearDTCs();
+        return "44\r\r>";  // Mode 04 response
+    }
+
+    // Handle OBD-II mode 07 request (pending DTCs)
+    String handleMode07() {
+        // For simplicity, we'll report no pending DTCs
+        // (Real systems would track pending vs confirmed DTCs separately)
+        return "NO DATA\r\r>";
+    }
+
     String handleRequest(String request) {
         request.trim();
         request.toUpperCase();
@@ -178,18 +275,28 @@ public:
         // Parse mode
         uint8_t mode = strtol(request.substring(0, 2).c_str(), NULL, 16);
 
-        // We only support mode 01 (current data)
-        if (mode != 0x01) {
-            return "NO DATA\r\r>";
-        }
+        // Handle different modes
+        switch (mode) {
+            case 0x01:  // Current data
+                // Parse PID (if present)
+                if (request.length() >= 4) {
+                    uint8_t pid = strtol(request.substring(2, 4).c_str(), NULL, 16);
+                    return handleMode01(pid);
+                }
+                return "?\r\r>";
 
-        // Parse PID (if present)
-        if (request.length() >= 4) {
-            uint8_t pid = strtol(request.substring(2, 4).c_str(), NULL, 16);
-            return handleMode01(pid);
-        }
+            case 0x03:  // Show stored DTCs
+                return handleMode03();
 
-        return "?\r\r>";
+            case 0x04:  // Clear DTCs and MIL
+                return handleMode04();
+
+            case 0x07:  // Show pending DTCs
+                return handleMode07();
+
+            default:
+                return "NO DATA\r\r>";
+        }
     }
 };
 
