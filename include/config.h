@@ -1,12 +1,14 @@
 #ifndef CONFIG_H
 #define CONFIG_H
 
+#include "platform_config.h"
+
 // WiFi AP Configuration
 // SSID will be generated as "iCAR_PRO_XXXX" where XXXX = last 2 octets of MAC
 #define WIFI_SSID_PREFIX "iCAR_PRO_"
 #define WIFI_PASSWORD ""  // vGate iCar Pro default: no password (open network)
 #define WIFI_CHANNEL 6
-#define MAX_CONNECTIONS 2
+// MAX_CONNECTIONS is defined in platform_config.h (2 for ESP-01, 4 for ESP32)
 
 // Network Configuration (vGate iCar Pro defaults)
 #define AP_IP_ADDRESS IPAddress(192, 168, 0, 10)
@@ -19,7 +21,13 @@
 
 // ELM327 Protocol Settings
 #define ELM_DEVICE_DESC "ELM327 v1.5"
-#define ELM_DEVICE_ID "MockStang ESP-01S"
+#ifdef ESP01_BUILD
+    #define ELM_DEVICE_ID "MockStang ESP-01S"
+#elif defined(ESP32_BUILD)
+    #define ELM_DEVICE_ID "MockStang ESP32-S3"
+#else
+    #define ELM_DEVICE_ID "MockStang"
+#endif
 #define ELM_VOLTAGE "12.8V"  // Simulated car voltage
 
 // Maximum number of stored DTCs
@@ -70,9 +78,9 @@ const CarState DEFAULT_CAR_STATE = {
     .dtcs = {0}              // Empty DTC array
 };
 
-// Memory optimization
+// Memory optimization (platform-specific in platform_config.h)
 #define MAX_COMMAND_LENGTH 64
 #define MAX_RESPONSE_LENGTH 128
-#define WEBSOCKET_BUFFER_SIZE 256
+// WEBSOCKET_BUFFER_SIZE is defined in platform_config.h (256 for ESP-01, 512 for ESP32)
 
 #endif // CONFIG_H

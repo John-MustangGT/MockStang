@@ -1,5 +1,21 @@
-#include <ESP8266WiFi.h>
+#include <Arduino.h>
 #include "config.h"
+
+// Platform-specific WiFi includes
+#ifdef ESP01_BUILD
+    #include <ESP8266WiFi.h>
+    #include <ESPAsyncTCP.h>
+#elif defined(ESP32_BUILD)
+    #include <WiFi.h>
+    #include <AsyncTCP.h>
+    #if ENABLE_BLE
+        #include "ble_server.h"
+    #endif
+    #if ENABLE_DISPLAY
+        #include "display_manager.h"
+    #endif
+#endif
+
 #include "elm327_protocol.h"
 #include "pid_handler.h"
 #include "web_server.h"
@@ -15,6 +31,14 @@ PIDHandler* pidHandler;
 WebServer* webServer;
 ConfigManager* configManager;
 
+#if ENABLE_BLE
+    BLEServer* bleServer;
+#endif
+
+#if ENABLE_DISPLAY
+    DisplayManager* display;
+#endif
+
 // Client connection state
 bool clientConnected = false;
 String inputBuffer = "";
@@ -24,7 +48,7 @@ void setup() {
     delay(100);
 
     Serial.println("\n\n=================================");
-    Serial.println("MockStang - WiFi OBD-II Emulator");
+    Serial.printf("MockStang - OBD-II Emulator (%s)\n", PLATFORM_NAME);
     Serial.println("=================================\n");
 
     // Load configuration from EEPROM
@@ -44,6 +68,13 @@ void setup() {
     pidHandler->updateMAF(configManager->getDefaultMAF());
     pidHandler->updateFuelLevel(configManager->getDefaultFuelLevel());
     pidHandler->updateBarometric(configManager->getDefaultBarometric());
+
+    #if ENABLE_DISPLAY
+        // Initialize TFT display (ESP32 only)
+        display = new DisplayManager(pidHandler);
+        display->begin();
+        display->showSplash();
+    #endif
 
     // Generate SSID (either custom or MAC-based)
     WiFi.mode(WIFI_AP);
@@ -85,6 +116,13 @@ void setup() {
     // Start web server
     webServer->begin();
 
+    #if ENABLE_BLE
+        // Initialize BLE server (ESP32 only)
+        bleServer = new BLEServer(pidHandler, configManager);
+        bleServer->begin();
+        Serial.println("BLE server started and advertising");
+    #endif
+
     Serial.println("\n=================================");
     Serial.println("System Ready!");
     Serial.printf("Connect to WiFi: %s\n", ssid);
@@ -96,6 +134,16 @@ void setup() {
 void loop() {
     // Handle web server
     webServer->loop();
+
+    #if ENABLE_BLE
+        // Handle BLE connections
+        bleServer->loop();
+    #endif
+
+    #if ENABLE_DISPLAY
+        // Update display
+        display->update();
+    #endif
 
     // Check for new ELM327 client connections
     if (elm327Server.hasClient()) {
