@@ -131,8 +131,8 @@ public:
             // CAN auto formatting
             return response + "OK\r\r>";
         }
-        else if (cmd.startsWith("ATD")) {
-            // Set defaults
+        else if (cmd == "ATD") {
+            // Set defaults (exact match only)
             reset();
             return response + "OK\r\r>";
         }
