@@ -4,9 +4,7 @@
 #include <Arduino.h>
 #include "config.h"
 #include "elm327_protocol.h"
-
-// Forward declaration
-class ConfigManager;
+#include "config_manager.h"
 
 class PIDHandler {
 private:
