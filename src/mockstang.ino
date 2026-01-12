@@ -156,6 +156,9 @@ void loop() {
         // This section could be expanded to handle queued messages
     }
 
+    // Update driving simulator
+    pidHandler->updateDrivingSimulator();
+
     delay(1);  // Small delay to prevent watchdog timer issues
 }
 

@@ -323,6 +323,20 @@ public:
             pidHandler->clearDTCs();
             Serial.println("All DTCs cleared");
         }
+        else if (message.indexOf("\"cmd\":\"set_drive_mode\"") >= 0) {
+            // Parse drive mode value
+            int modeStart = message.indexOf("\"mode\":") + 7;
+            int modeEnd = message.indexOf(",", modeStart);
+            if (modeEnd < 0) modeEnd = message.indexOf("}", modeStart);
+            String modeStr = message.substring(modeStart, modeEnd);
+            int mode = modeStr.toInt();
+
+            if (mode >= 0 && mode <= 4) {
+                pidHandler->setDriveMode((DriveMode)mode);
+                const char* modeNames[] = {"OFF", "GENTLE", "NORMAL", "SPORT", "DRAG"};
+                Serial.printf("Drive mode set to: %s\n", modeNames[mode]);
+            }
+        }
 
         if (param.length() > 0) {
             Serial.printf("Parameter updated: %s = %d\n", param.c_str(), value);

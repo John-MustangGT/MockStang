@@ -39,6 +39,21 @@ button:hover{background:#ff8555}
 </div>
 
 <div class="card">
+<h3>🚗 Driving Simulator</h3>
+<p style="color:#aaa;margin:10px 0">Automatically animate vehicle parameters</p>
+<div style="display:flex;gap:10px;flex-wrap:wrap">
+<button onclick="setDriveMode(0)" id="driveOff" style="background:#666">OFF</button>
+<button onclick="setDriveMode(1)" id="driveGentle">GENTLE</button>
+<button onclick="setDriveMode(2)" id="driveNormal">NORMAL</button>
+<button onclick="setDriveMode(3)" id="driveSport">SPORT</button>
+<button onclick="setDriveMode(4)" id="driveDrag">DRAG RACE</button>
+</div>
+<div id="driveStatus" style="margin-top:15px;padding:10px;background:#1a1a1a;border-radius:4px;font-family:monospace;font-size:12px;color:#888">
+Simulator: OFF
+</div>
+</div>
+
+<div class="card">
 <h3>Car Parameters</h3>
 <div class="slider-group">
 <label>RPM:</label>
@@ -263,6 +278,29 @@ function updateDTCList(){
     });
     html+='<button onclick="clearAllDTCs()" style="margin-top:10px;background:#dc2626">Clear All DTCs</button>';
     list.innerHTML=html;
+  }
+}
+
+var currentDriveMode=0;
+
+function setDriveMode(mode){
+  currentDriveMode=mode;
+  // Update button styles
+  var modes=['driveOff','driveGentle','driveNormal','driveSport','driveDrag'];
+  modes.forEach(function(id,idx){
+    var btn=document.getElementById(id);
+    if(idx===mode){
+      btn.style.background='#16a34a';
+    }else{
+      btn.style.background=(idx===0)?'#666':'#ff6b35';
+    }
+  });
+  // Update status
+  var modeNames=['OFF','GENTLE (0-50 km/h, 5s, warming up)','NORMAL (0-80 km/h, 7s, cruise, stop)','SPORT (0-120 km/h, 8s, hard accel)','DRAG RACE (0-180 km/h, 12s, full throttle)'];
+  document.getElementById('driveStatus').innerText='Simulator: '+modeNames[mode];
+  // Send command
+  if(ws && ws.readyState===WebSocket.OPEN){
+    ws.send(JSON.stringify({cmd:'set_drive_mode',mode:mode}));
   }
 }
 

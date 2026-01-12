@@ -15,10 +15,18 @@ private:
     ConfigManager* config;
     unsigned long startTime;
 
+    // Driving simulator state
+    DriveMode driveMode;
+    unsigned long driveStartTime;
+    uint8_t drivePhase;  // 0=accel, 1=cruise, 2=decel, 3=stopped
+
 public:
     PIDHandler(ELM327Protocol* elmProtocol, ConfigManager* configMgr) : elm(elmProtocol), config(configMgr) {
         currentState = DEFAULT_CAR_STATE;
         startTime = millis();
+        driveMode = DRIVE_OFF;
+        driveStartTime = 0;
+        drivePhase = 0;
     }
 
     // Update a specific car parameter
@@ -96,6 +104,172 @@ public:
     void resetRuntime() {
         startTime = millis();
         currentState.runtime = 0;
+    }
+
+    // Driving Simulator Control
+    void setDriveMode(DriveMode mode) {
+        driveMode = mode;
+        driveStartTime = millis();
+        drivePhase = 0;
+        if (mode == DRIVE_OFF) {
+            // Stop at current state
+        } else {
+            // Reset to idle state at start
+            currentState.speed = 0;
+            currentState.rpm = 850;
+            currentState.throttle = 0;
+            if (mode == DRIVE_GENTLE) {
+                currentState.coolant_temp = 50;  // Cold engine
+            } else {
+                currentState.coolant_temp = 90;  // Warm engine
+            }
+        }
+    }
+
+    DriveMode getDriveMode() { return driveMode; }
+
+    // Update driving simulator (call from main loop)
+    void updateDrivingSimulator() {
+        if (driveMode == DRIVE_OFF) return;
+
+        unsigned long elapsed = millis() - driveStartTime;
+        float elapsedSec = elapsed / 1000.0;
+
+        switch (driveMode) {
+            case DRIVE_GENTLE: {
+                // 0-50 km/h in 5s, then hold, engine warming up
+                if (drivePhase == 0) {  // Acceleration
+                    if (elapsedSec < 5.0) {
+                        currentState.speed = (uint8_t)(elapsedSec * 10);  // 0-50 km/h
+                        currentState.rpm = 850 + (uint16_t)(elapsedSec * 400);  // 850-2850 RPM
+                        currentState.throttle = 30;
+                        // Engine warming up
+                        currentState.coolant_temp = 50 + (uint8_t)(elapsedSec * 4);  // 50-70°C
+                    } else {
+                        drivePhase = 1;
+                    }
+                } else if (drivePhase == 1) {  // Cruise
+                    currentState.speed = 50;
+                    currentState.rpm = 2000;
+                    currentState.throttle = 15;
+                    // Continue warming
+                    if (currentState.coolant_temp < 90) {
+                        currentState.coolant_temp++;
+                    }
+                }
+                currentState.maf = 200 + currentState.throttle * 10;
+                break;
+            }
+
+            case DRIVE_NORMAL: {
+                // 0-80 km/h in 7s, cruise, then slow to stop
+                if (drivePhase == 0) {  // Acceleration
+                    if (elapsedSec < 7.0) {
+                        currentState.speed = (uint8_t)(elapsedSec * 11.4);  // 0-80 km/h
+                        currentState.rpm = 850 + (uint16_t)(elapsedSec * 500);  // 850-4350 RPM
+                        currentState.throttle = 50;
+                    } else {
+                        drivePhase = 1;
+                    }
+                } else if (drivePhase == 1) {  // Cruise for 10s
+                    if (elapsedSec < 17.0) {
+                        currentState.speed = 80;
+                        currentState.rpm = 2500;
+                        currentState.throttle = 25;
+                    } else {
+                        drivePhase = 2;
+                    }
+                } else if (drivePhase == 2) {  // Deceleration
+                    float decelTime = elapsedSec - 17.0;
+                    if (decelTime < 5.0) {
+                        currentState.speed = 80 - (uint8_t)(decelTime * 16);  // 80-0 km/h
+                        currentState.rpm = 2500 - (uint16_t)(decelTime * 330);  // 2500-850 RPM
+                        currentState.throttle = 0;
+                    } else {
+                        drivePhase = 3;
+                    }
+                } else {  // Stopped
+                    currentState.speed = 0;
+                    currentState.rpm = 850;
+                    currentState.throttle = 0;
+                }
+                currentState.maf = 200 + currentState.throttle * 8;
+                break;
+            }
+
+            case DRIVE_SPORT: {
+                // 0-120 km/h in 8s, hard acceleration
+                if (drivePhase == 0) {  // Acceleration
+                    if (elapsedSec < 8.0) {
+                        currentState.speed = (uint8_t)(elapsedSec * 15);  // 0-120 km/h
+                        currentState.rpm = 1500 + (uint16_t)(elapsedSec * 625);  // 1500-6500 RPM
+                        currentState.throttle = 85;
+                    } else {
+                        drivePhase = 1;
+                    }
+                } else if (drivePhase == 1) {  // Cruise for 8s
+                    if (elapsedSec < 16.0) {
+                        currentState.speed = 120;
+                        currentState.rpm = 3500;
+                        currentState.throttle = 40;
+                    } else {
+                        drivePhase = 2;
+                    }
+                } else if (drivePhase == 2) {  // Hard braking
+                    float decelTime = elapsedSec - 16.0;
+                    if (decelTime < 4.0) {
+                        currentState.speed = 120 - (uint8_t)(decelTime * 30);  // 120-0 km/h
+                        currentState.rpm = 3500 - (uint16_t)(decelTime * 662);  // 3500-850 RPM
+                        currentState.throttle = 0;
+                    } else {
+                        drivePhase = 3;
+                    }
+                } else {  // Stopped
+                    currentState.speed = 0;
+                    currentState.rpm = 850;
+                    currentState.throttle = 0;
+                }
+                currentState.maf = 200 + currentState.throttle * 10;
+                break;
+            }
+
+            case DRIVE_DRAG: {
+                // Drag race: 0-180 km/h in 12s flat out, then hard brake
+                if (drivePhase == 0) {  // Launch and acceleration
+                    if (elapsedSec < 12.0) {
+                        currentState.speed = (uint8_t)(elapsedSec * 15);  // 0-180 km/h
+                        if (elapsedSec < 1.0) {
+                            // Launch - high RPM, slow speed
+                            currentState.rpm = 3000 + (uint16_t)(elapsedSec * 2000);  // 3000-5000 RPM
+                        } else {
+                            // Full acceleration
+                            currentState.rpm = 2000 + (uint16_t)((elapsedSec - 1.0) * 454);  // 2000-7000 RPM
+                        }
+                        currentState.throttle = 100;
+                    } else {
+                        drivePhase = 1;
+                    }
+                } else if (drivePhase == 1) {  // Hard braking
+                    float brakeTime = elapsedSec - 12.0;
+                    if (brakeTime < 6.0) {
+                        currentState.speed = 180 - (uint8_t)(brakeTime * 30);  // 180-0 km/h
+                        currentState.rpm = 7000 - (uint16_t)(brakeTime * 1025);  // 7000-850 RPM
+                        currentState.throttle = 0;
+                    } else {
+                        drivePhase = 2;
+                    }
+                } else {  // Stopped
+                    currentState.speed = 0;
+                    currentState.rpm = 850;
+                    currentState.throttle = 0;
+                }
+                currentState.maf = 200 + currentState.throttle * 12;
+                break;
+            }
+
+            default:
+                break;
+        }
     }
 
     // Handle OBD-II mode 01 request

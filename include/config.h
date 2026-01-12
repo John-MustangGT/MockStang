@@ -25,6 +25,15 @@
 // Maximum number of stored DTCs
 #define MAX_DTCS 8
 
+// Driving Simulator Modes
+enum DriveMode {
+    DRIVE_OFF = 0,       // Manual control only
+    DRIVE_GENTLE = 1,    // Gentle acceleration, warming up (0-50 km/h in 5s)
+    DRIVE_NORMAL = 2,    // Normal driving (0-80 km/h in 7s)
+    DRIVE_SPORT = 3,     // Sporty driving (0-120 km/h in 8s)
+    DRIVE_DRAG = 4       // Drag race (0-180 km/h in 12s, full throttle)
+};
+
 // Default PID Values (adjustable via web interface)
 struct CarState {
     uint16_t rpm;           // 0x0C - Engine RPM
