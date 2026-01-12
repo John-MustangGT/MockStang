@@ -85,7 +85,7 @@ public:
                 dataLen = 1;
                 break;
 
-            case 0x0C:  // Engine RPM
+            case 0x0C: {  // Engine RPM
                 // RPM is encoded as (RPM * 4) as 16-bit big-endian
                 // Formula: RPM = ((A * 256) + B) / 4
                 uint16_t encodedRPM = currentState.rpm * 4;
@@ -93,6 +93,7 @@ public:
                 data[1] = encodedRPM & 0xFF;
                 dataLen = 2;
                 break;
+            }
 
             case 0x0D:  // Vehicle speed
                 data[0] = currentState.speed;
