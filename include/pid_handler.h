@@ -5,14 +5,18 @@
 #include "config.h"
 #include "elm327_protocol.h"
 
+// Forward declaration
+class ConfigManager;
+
 class PIDHandler {
 private:
     CarState currentState;
     ELM327Protocol* elm;
+    ConfigManager* config;
     unsigned long startTime;
 
 public:
-    PIDHandler(ELM327Protocol* elmProtocol) : elm(elmProtocol) {
+    PIDHandler(ELM327Protocol* elmProtocol, ConfigManager* configMgr) : elm(elmProtocol), config(configMgr) {
         currentState = DEFAULT_CAR_STATE;
         startTime = millis();
     }
@@ -262,6 +266,142 @@ public:
         return "NO DATA\r\r>";
     }
 
+    // Handle OBD-II mode 09 request (vehicle information)
+    String handleMode09(uint8_t pid) {
+        char buf[8];
+        String response = "";
+
+        switch (pid) {
+            case 0x00: {  // Supported PIDs [01-20]
+                // We support: 0x02 (VIN), 0x0A (ECU name)
+                if (elm->getHeaders()) {
+                    response = "7E8";
+                    if (elm->getSpaces()) response += " ";
+                    sprintf(buf, "06");
+                    response += buf;
+                }
+                if (elm->getSpaces()) response += " ";
+                sprintf(buf, "49");
+                response += buf;
+                if (elm->getSpaces()) response += " ";
+                sprintf(buf, "00");
+                response += buf;
+                if (elm->getSpaces()) response += " ";
+                sprintf(buf, "54");  // 0x02 and 0x0A supported
+                response += buf;
+                if (elm->getSpaces()) response += " ";
+                sprintf(buf, "00");
+                response += buf;
+                if (elm->getSpaces()) response += " ";
+                sprintf(buf, "00");
+                response += buf;
+                if (elm->getSpaces()) response += " ";
+                sprintf(buf, "00");
+                response += buf;
+                response += "\r\r>";
+                return response;
+            }
+
+            case 0x02: {  // VIN (17 characters, multi-line response)
+                // VIN is sent as multi-line CAN messages
+                // Line 1: 49 02 01 XX XX XX XX (message count + first 5 chars)
+                // Line 2: 49 02 02 XX XX XX XX (next 7 chars)
+                // Line 3: 49 02 03 XX XX XX XX (last 5 chars)
+
+                const char* vin = config->getVIN();
+                int vinLen = strlen(vin);
+                if (vinLen != 17) {
+                    return "NO DATA\r\r>";
+                }
+
+                // Message 1: byte count (01) + first 5 VIN chars
+                if (elm->getHeaders()) {
+                    response = "7E8";
+                    if (elm->getSpaces()) response += " ";
+                }
+                sprintf(buf, "%s49%s02%s01",
+                        elm->getSpaces() ? "06 " : "06",
+                        elm->getSpaces() ? " " : "",
+                        elm->getSpaces() ? " " : "");
+                response += buf;
+                for (int i = 0; i < 5 && i < vinLen; i++) {
+                    if (elm->getSpaces()) response += " ";
+                    sprintf(buf, "%02X", (uint8_t)vin[i]);
+                    response += buf;
+                }
+                response += "\r";
+
+                // Message 2: sequence 02 + next 7 VIN chars
+                if (elm->getHeaders()) {
+                    response += "7E8";
+                    if (elm->getSpaces()) response += " ";
+                }
+                sprintf(buf, "%s49%s02%s02",
+                        elm->getSpaces() ? "08 " : "08",
+                        elm->getSpaces() ? " " : "",
+                        elm->getSpaces() ? " " : "");
+                response += buf;
+                for (int i = 5; i < 12 && i < vinLen; i++) {
+                    if (elm->getSpaces()) response += " ";
+                    sprintf(buf, "%02X", (uint8_t)vin[i]);
+                    response += buf;
+                }
+                response += "\r";
+
+                // Message 3: sequence 03 + last 5 VIN chars
+                if (elm->getHeaders()) {
+                    response += "7E8";
+                    if (elm->getSpaces()) response += " ";
+                }
+                sprintf(buf, "%s49%s02%s03",
+                        elm->getSpaces() ? "06 " : "06",
+                        elm->getSpaces() ? " " : "",
+                        elm->getSpaces() ? " " : "");
+                response += buf;
+                for (int i = 12; i < 17 && i < vinLen; i++) {
+                    if (elm->getSpaces()) response += " ";
+                    sprintf(buf, "%02X", (uint8_t)vin[i]);
+                    response += buf;
+                }
+                response += "\r\r>";
+                return response;
+            }
+
+            case 0x0A: {  // ECU Name
+                const char* ecuName = ELM_DEVICE_ID;
+                int nameLen = strlen(ecuName);
+                if (nameLen > 20) nameLen = 20;  // Limit to 20 chars
+
+                if (elm->getHeaders()) {
+                    response = "7E8";
+                    if (elm->getSpaces()) response += " ";
+                }
+
+                // Length byte
+                uint8_t length = 2 + nameLen;  // mode + PID + name bytes
+                sprintf(buf, "%02X", length);
+                response += buf;
+                if (elm->getSpaces()) response += " ";
+
+                // Mode + PID
+                sprintf(buf, "49%s0A", elm->getSpaces() ? " " : "");
+                response += buf;
+
+                // ECU name as ASCII bytes
+                for (int i = 0; i < nameLen; i++) {
+                    if (elm->getSpaces()) response += " ";
+                    sprintf(buf, "%02X", (uint8_t)ecuName[i]);
+                    response += buf;
+                }
+                response += "\r\r>";
+                return response;
+            }
+
+            default:
+                return "NO DATA\r\r>";
+        }
+    }
+
     String handleRequest(String request) {
         request.trim();
         request.toUpperCase();
@@ -293,6 +433,14 @@ public:
 
             case 0x07:  // Show pending DTCs
                 return handleMode07();
+
+            case 0x09:  // Vehicle information
+                // Parse PID (if present)
+                if (request.length() >= 4) {
+                    uint8_t pid = strtol(request.substring(2, 4).c_str(), NULL, 16);
+                    return handleMode09(pid);
+                }
+                return "?\r\r>";
 
             default:
                 return "NO DATA\r\r>";

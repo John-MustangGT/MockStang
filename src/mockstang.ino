@@ -32,7 +32,7 @@ void setup() {
     configManager->load();
 
     // Initialize handlers
-    pidHandler = new PIDHandler(&elm327);
+    pidHandler = new PIDHandler(&elm327, configManager);
     webServer = new WebServer(pidHandler, configManager);
 
     // Apply default PID values from config
