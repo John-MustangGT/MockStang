@@ -174,7 +174,9 @@ void processCommand(String command) {
     if (command.startsWith("AT") || command.startsWith("at")) {
         response = elm327.handleCommand(command);
     } else {
-        // OBD-II request
+        // OBD-II request - simulate ECU query delay
+        // Real ELM327 adapters have 20-100ms delay for CAN bus communication
+        delay(35);
         response = pidHandler->handleRequest(command);
     }
 
