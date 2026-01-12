@@ -86,8 +86,11 @@ public:
                 break;
 
             case 0x0C:  // Engine RPM
-                data[0] = currentState.rpm >> 8;
-                data[1] = currentState.rpm & 0xFF;
+                // RPM is encoded as (RPM * 4) as 16-bit big-endian
+                // Formula: RPM = ((A * 256) + B) / 4
+                uint16_t encodedRPM = currentState.rpm * 4;
+                data[0] = encodedRPM >> 8;
+                data[1] = encodedRPM & 0xFF;
                 dataLen = 2;
                 break;
 

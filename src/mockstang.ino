@@ -181,7 +181,7 @@ void processCommand(String command) {
     // Send response to client
     elm327Client.print(response);
 
-    Serial.printf("RESP: %s", response.c_str());
+    Serial.printf("RESP: %s\n", response.c_str());
 
     // Broadcast to web interface
     webServer->broadcastOBDActivity(command, response);
