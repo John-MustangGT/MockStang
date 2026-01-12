@@ -83,6 +83,32 @@ button:hover{background:#ff8555}
 </div>
 
 <div class="card">
+<h3>MIL & Diagnostic Codes</h3>
+<div class="slider-group">
+<label>Check Engine Light:</label>
+<button id="milBtn" onclick="toggleMIL()" style="width:80px;margin:0">OFF</button>
+<span id="milStatus" style="margin-left:10px;color:#888">No codes</span>
+</div>
+<div style="margin-top:15px">
+<h4 style="margin:10px 0">Add DTC:</h4>
+<div style="display:flex;gap:10px;align-items:center">
+<select id="dtcType" style="padding:8px;background:#1a1a1a;border:1px solid #444;color:#fff;border-radius:4px">
+<option value="0">P0xxx (Powertrain)</option>
+<option value="1">P1xxx (Manufacturer)</option>
+<option value="2">P2xxx (Powertrain)</option>
+<option value="3">P3xxx (Powertrain)</option>
+<option value="C">C0xxx (Chassis)</option>
+<option value="B">B0xxx (Body)</option>
+<option value="U">U0xxx (Network)</option>
+</select>
+<input type="text" id="dtcCode" placeholder="0420" maxlength="4" style="width:100px;padding:8px;background:#1a1a1a;border:1px solid #444;color:#fff;border-radius:4px">
+<button onclick="addDTC()">Add Code</button>
+</div>
+</div>
+<div id="dtcList" style="margin-top:15px;font-family:monospace"></div>
+</div>
+
+<div class="card">
 <h3>OBD-II Activity Monitor</h3>
 <div id="log"></div>
 </div>
@@ -137,7 +163,114 @@ function clearLog(){
   document.getElementById('log').innerHTML='';
 }
 
-window.onload=initWebSocket;
+var milState=false;
+var dtcs=[];
+
+function toggleMIL(){
+  milState=!milState;
+  var btn=document.getElementById('milBtn');
+  if(milState){
+    btn.innerText='ON';
+    btn.style.background='#dc2626';
+  }else{
+    btn.innerText='OFF';
+    btn.style.background='#ff6b35';
+  }
+  if(ws && ws.readyState===WebSocket.OPEN){
+    ws.send(JSON.stringify({cmd:'set_mil',value:milState}));
+  }
+  updateMILStatus();
+}
+
+function addDTC(){
+  var type=document.getElementById('dtcType').value;
+  var code=document.getElementById('dtcCode').value.trim();
+  if(code.length!==4 || !/^[0-9A-F]+$/i.test(code)){
+    alert('Please enter a valid 4-digit hex code (e.g., 0420)');
+    return;
+  }
+  var dtcStr=type.toUpperCase()+code.toUpperCase();
+  if(dtcs.includes(dtcStr)){
+    alert('DTC already exists');
+    return;
+  }
+  if(dtcs.length>=8){
+    alert('Maximum 8 DTCs allowed');
+    return;
+  }
+  dtcs.push(dtcStr);
+  milState=true;
+  document.getElementById('dtcCode').value='';
+  if(ws && ws.readyState===WebSocket.OPEN){
+    ws.send(JSON.stringify({cmd:'add_dtc',dtc:dtcStr}));
+  }
+  updateDTCList();
+  updateMILStatus();
+}
+
+function removeDTC(dtc){
+  var idx=dtcs.indexOf(dtc);
+  if(idx>-1){
+    dtcs.splice(idx,1);
+    if(ws && ws.readyState===WebSocket.OPEN){
+      ws.send(JSON.stringify({cmd:'remove_dtc',dtc:dtc}));
+    }
+    updateDTCList();
+    updateMILStatus();
+  }
+}
+
+function clearAllDTCs(){
+  dtcs=[];
+  milState=false;
+  if(ws && ws.readyState===WebSocket.OPEN){
+    ws.send(JSON.stringify({cmd:'clear_dtcs'}));
+  }
+  updateDTCList();
+  updateMILStatus();
+}
+
+function updateMILStatus(){
+  var btn=document.getElementById('milBtn');
+  var status=document.getElementById('milStatus');
+  if(milState){
+    btn.innerText='ON';
+    btn.style.background='#dc2626';
+  }else{
+    btn.innerText='OFF';
+    btn.style.background='#ff6b35';
+  }
+  if(dtcs.length===0){
+    status.innerText='No codes';
+    status.style.color='#888';
+  }else{
+    status.innerText=dtcs.length+' code(s) stored';
+    status.style.color='#ff6b35';
+  }
+}
+
+function updateDTCList(){
+  var list=document.getElementById('dtcList');
+  if(dtcs.length===0){
+    list.innerHTML='<div style="color:#888;font-style:italic">No DTCs stored</div>';
+  }else{
+    var html='<h4 style="margin:10px 0">Stored DTCs:</h4>';
+    dtcs.forEach(function(dtc){
+      html+='<div style="padding:5px;background:#1a1a1a;margin:5px 0;border-radius:4px;display:flex;justify-content:space-between;align-items:center">';
+      html+='<span style="color:#ff6b35">'+dtc+'</span>';
+      html+='<button onclick="removeDTC(\''+dtc+'\')" style="padding:5px 10px;font-size:12px">Remove</button>';
+      html+='</div>';
+    });
+    html+='<button onclick="clearAllDTCs()" style="margin-top:10px;background:#dc2626">Clear All DTCs</button>';
+    list.innerHTML=html;
+  }
+}
+
+window.onload=function(){
+  initWebSocket();
+  updateDTCList();
+  updateMILStatus();
+};
 </script>
 </body>
 </html>

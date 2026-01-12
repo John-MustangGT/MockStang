@@ -219,6 +219,43 @@ public:
         }
     }
 
+    // Parse DTC string (e.g., "P0420") to 16-bit code
+    // Format: First 2 bits = type (P0/P2/P3=00, P1=01, C=10, B=11)
+    //         Next 2 bits = first digit
+    //         Last 12 bits = remaining 3 hex digits
+    uint16_t parseDTC(String dtc) {
+        if (dtc.length() != 5) return 0xFFFF;
+
+        dtc.toUpperCase();
+        char type = dtc.charAt(0);
+        uint16_t code = 0;
+
+        // Determine type bits
+        if (type == 'P') {
+            char first = dtc.charAt(1);
+            if (first == '0') code = 0x0000;
+            else if (first == '1') code = 0x4000;
+            else if (first == '2') code = 0x8000;
+            else if (first == '3') code = 0xC000;
+            else return 0xFFFF;
+        } else if (type == 'C') {
+            code = 0x4000;  // Chassis
+        } else if (type == 'B') {
+            code = 0x8000;  // Body
+        } else if (type == 'U') {
+            code = 0xC000;  // Network
+        } else {
+            return 0xFFFF;
+        }
+
+        // Add remaining 3 hex digits
+        String hexPart = dtc.substring(2);
+        uint16_t hexValue = (uint16_t)strtol(hexPart.c_str(), NULL, 16);
+        code |= hexValue;
+
+        return code;
+    }
+
     // Handle WebSocket message (parameter update from web UI)
     void handleWebSocketMessage(String message) {
         // Simple JSON parsing (format: {"param":"rpm","value":1500})
@@ -245,8 +282,51 @@ public:
         if (message.indexOf("\"cmd\":\"reset_runtime\"") >= 0) {
             pidHandler->resetRuntime();
         }
+        else if (message.indexOf("\"cmd\":\"set_mil\"") >= 0) {
+            // Parse boolean value
+            bool milOn = (message.indexOf("\"value\":true") >= 0);
+            pidHandler->setMIL(milOn);
+            Serial.printf("MIL set to: %s\n", milOn ? "ON" : "OFF");
+        }
+        else if (message.indexOf("\"cmd\":\"add_dtc\"") >= 0) {
+            // Parse DTC string (e.g., "P0420")
+            int dtcStart = message.indexOf("\"dtc\":\"") + 7;
+            int dtcEnd = message.indexOf("\"", dtcStart);
+            String dtcStr = message.substring(dtcStart, dtcEnd);
 
-        Serial.printf("Parameter updated: %s = %d\n", param.c_str(), value);
+            // Convert DTC string to 16-bit code
+            uint16_t dtcCode = parseDTC(dtcStr);
+            if (dtcCode != 0xFFFF) {
+                if (pidHandler->addDTC(dtcCode)) {
+                    Serial.printf("Added DTC: %s (0x%04X)\n", dtcStr.c_str(), dtcCode);
+                } else {
+                    Serial.printf("Failed to add DTC: %s (full or duplicate)\n", dtcStr.c_str());
+                }
+            } else {
+                Serial.printf("Invalid DTC format: %s\n", dtcStr.c_str());
+            }
+        }
+        else if (message.indexOf("\"cmd\":\"remove_dtc\"") >= 0) {
+            // Parse DTC string
+            int dtcStart = message.indexOf("\"dtc\":\"") + 7;
+            int dtcEnd = message.indexOf("\"", dtcStart);
+            String dtcStr = message.substring(dtcStart, dtcEnd);
+
+            uint16_t dtcCode = parseDTC(dtcStr);
+            if (dtcCode != 0xFFFF) {
+                if (pidHandler->removeDTC(dtcCode)) {
+                    Serial.printf("Removed DTC: %s\n", dtcStr.c_str());
+                }
+            }
+        }
+        else if (message.indexOf("\"cmd\":\"clear_dtcs\"") >= 0) {
+            pidHandler->clearDTCs();
+            Serial.println("All DTCs cleared");
+        }
+
+        if (param.length() > 0) {
+            Serial.printf("Parameter updated: %s = %d\n", param.c_str(), value);
+        }
     }
 
     // Check for WebSocket messages
