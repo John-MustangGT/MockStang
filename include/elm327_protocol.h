@@ -66,6 +66,10 @@ public:
             // Device description
             return response + ELM_DEVICE_ID "\r\r>";
         }
+        else if (cmd == "AT@2") {
+            // Device identifier (often same as @1)
+            return response + ELM_DEVICE_ID "\r\r>";
+        }
         else if (cmd == "ATRV") {
             // Read voltage
             return response + ELM_VOLTAGE "\r\r>";
@@ -135,6 +139,10 @@ public:
         else if (cmd.startsWith("ATWS")) {
             // Warm start
             return response + "ELM327 v1.5\r\r>";
+        }
+        else if (cmd.startsWith("ATSW")) {
+            // Set wakeup message (not commonly used, just acknowledge)
+            return response + "OK\r\r>";
         }
         else if (cmd == "AT" || cmd.length() == 0) {
             // Empty AT command
