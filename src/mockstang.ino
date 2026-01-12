@@ -101,12 +101,12 @@ void loop() {
     if (elm327Server.hasClient()) {
         // If we already have a client, disconnect it
         if (clientConnected && elm327Client.connected()) {
-            WiFiClient newClient = elm327Server.available();
+            WiFiClient newClient = elm327Server.accept();
             Serial.println("New connection attempt - rejecting (already connected)");
             newClient.stop();
         } else {
             // Accept new client
-            elm327Client = elm327Server.available();
+            elm327Client = elm327Server.accept();
             if (elm327Client) {
                 clientConnected = true;
                 inputBuffer = "";
