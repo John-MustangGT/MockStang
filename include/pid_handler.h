@@ -138,11 +138,16 @@ public:
         switch (driveMode) {
             case DRIVE_GENTLE: {
                 // 0-50 km/h in 5s, then hold, engine warming up
+                // Add realistic throttle noise - small variations every 1-2 seconds
+                float noisePhase = fmod(elapsedSec * 2.0, 6.28);  // 0-2π over ~3 seconds
+                int8_t throttleNoise = (int8_t)(sin(noisePhase) * 4.0);  // +/- 4%
+                int8_t rpmNoise = (int8_t)(sin(noisePhase * 1.3) * 50);  // +/- 50 RPM (different phase)
+
                 if (drivePhase == 0) {  // Acceleration
                     if (elapsedSec < 5.0) {
                         currentState.speed = (uint8_t)(elapsedSec * 10);  // 0-50 km/h
-                        currentState.rpm = 850 + (uint16_t)(elapsedSec * 400);  // 850-2850 RPM
-                        currentState.throttle = 30;
+                        currentState.rpm = 850 + (uint16_t)(elapsedSec * 400) + rpmNoise;  // 850-2850 RPM + noise
+                        currentState.throttle = 30 + throttleNoise;  // 30% +/- 4%
                         // Engine warming up
                         currentState.coolant_temp = 50 + (uint8_t)(elapsedSec * 4);  // 50-70°C
                     } else {
@@ -150,8 +155,8 @@ public:
                     }
                 } else if (drivePhase == 1) {  // Cruise
                     currentState.speed = 50;
-                    currentState.rpm = 2000;
-                    currentState.throttle = 15;
+                    currentState.rpm = 2000 + rpmNoise;  // Slight RPM fluctuation
+                    currentState.throttle = 15 + throttleNoise;  // 15% +/- 4%
                     // Continue warming
                     if (currentState.coolant_temp < 90) {
                         currentState.coolant_temp++;
