@@ -1,9 +1,10 @@
-# MockStang - WiFi OBD-II Emulator
+# MockStang - WiFi/BLE OBD-II Emulator
 
-A WiFi-based OBD-II adapter emulator for ESP-01S that mimics the vGate iCar Pro WiFi adapter. Perfect for developing and testing OBD-II applications like OpenPonyLogger without needing a real vehicle.
+A multi-platform OBD-II adapter emulator that mimics the vGate iCar Pro WiFi adapter. Supports both ESP-01S (WiFi only) and ESP32-S3 (WiFi + BLE + Display). Perfect for developing and testing OBD-II applications like OpenPonyLogger without needing a real vehicle.
 
 ## Features
 
+### Common Features (All Platforms)
 - **ELM327 v1.5 Protocol Emulation** - Full AT command support
 - **WiFi Access Point Mode** - Emulates vGate iCar Pro WiFi adapter
 - **Real-time Web Dashboard** - Monitor and control mock data via browser
@@ -11,13 +12,26 @@ A WiFi-based OBD-II adapter emulator for ESP-01S that mimics the vGate iCar Pro 
 - **Adjustable PIDs** - Modify car parameters on-the-fly with sliders
 - **Persistent Configuration** - EEPROM-based settings storage
 - **Web-Based Settings** - Configure network, VIN, and defaults via browser
-- **Optimized for ESP-01S** - Runs on 1MB flash with ~50KB RAM
+- **Driving Simulator** - 4 aggressiveness levels (Gentle, Normal, Sport, Drag Race)
+- **MIL/DTC Management** - Check engine light and diagnostic trouble codes
+- **Mode 09 Support** - VIN and ECU name queries
+
+### ESP32-S3 Exclusive Features
+- **Bluetooth Low Energy (BLE)** - Peripheral mode for wireless OBD-II apps
+- **TFT Display** - Real-time parameter visualization on 240x135 screen
+- **Enhanced Performance** - More memory, faster processing, PSRAM support
 
 ## Hardware Requirements
 
+### ESP-01S (WiFi Only)
 - **ESP-01S** (1MB flash recommended)
 - **USB to Serial adapter** (for programming)
 - **3.3V power supply**
+
+### ESP32-S3 Feather (WiFi + BLE + Display)
+- **Adafruit ESP32-S3 Reverse TFT Feather** (includes 240x135 display)
+- **USB-C cable** (for programming and power)
+- Built-in battery charging and display
 
 ## Supported OBD-II PIDs
 
@@ -55,26 +69,53 @@ A WiFi-based OBD-II adapter emulator for ESP-01S that mimics the vGate iCar Pro 
    ```bash
    pio pkg install
    ```
+
+#### For ESP-01S (WiFi Only)
 4. Build the project:
    ```bash
-   pio run
+   pio run -e esp01
    ```
 5. Upload to ESP-01S:
    ```bash
-   pio run --target upload
+   pio run -e esp01 --target upload
+   ```
+
+#### For ESP32-S3 Feather (WiFi + BLE + Display)
+4. Build the project:
+   ```bash
+   pio run -e esp32s3
+   ```
+5. Upload to ESP32-S3:
+   ```bash
+   pio run -e esp32s3 --target upload
    ```
 
 ### Using Arduino IDE
 
-1. Install the following libraries via Library Manager:
-   - ESPAsyncWebServer
-   - ESPAsyncTCP
-   - ESP8266WiFi (included with ESP8266 board support)
+**Note:** PlatformIO is strongly recommended due to platform-specific build flags. If using Arduino IDE:
 
+#### For ESP-01S
+1. Install libraries via Library Manager:
+   - ESPAsyncWebServer
+   - ESPAsyncTCP (for ESP8266)
 2. Copy all files from `include/` to your sketch folder
 3. Open `src/mockstang.ino` in Arduino IDE
-4. Select **Board**: Generic ESP8266 Module
-5. Set **Flash Size**: 1MB (FS:256KB OTA:~374KB)
+4. Add `-DESP01_BUILD` to build flags
+5. Select **Board**: Generic ESP8266 Module
+6. Set **Flash Size**: 1MB (FS:256KB OTA:~374KB)
+7. Click Upload
+
+#### For ESP32-S3
+1. Install libraries via Library Manager:
+   - ESPAsyncWebServer
+   - AsyncTCP (for ESP32)
+   - NimBLE-Arduino
+   - Adafruit GFX Library
+   - Adafruit ST7735 and ST7789 Library
+2. Copy all files from `include/` to your sketch folder
+3. Open `src/mockstang.ino` in Arduino IDE
+4. Add `-DESP32_BUILD` to build flags
+5. Select **Board**: Adafruit Feather ESP32-S3 TFT
 6. Click Upload
 
 ## Configuration
@@ -239,26 +280,52 @@ Use the web dashboard sliders to simulate:
 ```
 MockStang/
 ├── include/
+│   ├── platform_config.h     # Platform detection and capabilities
 │   ├── config.h              # Compile-time configuration and defaults
 │   ├── config_manager.h      # EEPROM-based runtime configuration
 │   ├── elm327_protocol.h     # ELM327 AT command parser
 │   ├── pid_handler.h         # OBD-II PID response engine
 │   ├── web_server.h          # HTTP & WebSocket server
-│   └── web_interface.h       # Embedded HTML/JS dashboard (main + settings)
+│   ├── web_interface.h       # Embedded HTML/JS dashboard (main + settings)
+│   ├── ble_server.h          # BLE peripheral implementation (ESP32 only)
+│   └── display_manager.h     # TFT display manager (ESP32 only)
 ├── src/
-│   └── mockstang.ino         # Main application
-├── platformio.ini            # PlatformIO configuration
+│   └── mockstang.ino         # Main application with conditional compilation
+├── platformio.ini            # Multi-platform build configuration
+├── docs/
+│   ├── USER_MANUAL.md        # Comprehensive user guide
+│   └── TODO.md               # Feature roadmap
 └── README.md                 # This file
 ```
 
+## Platform Capabilities
+
+| Feature | ESP-01S | ESP32-S3 Feather |
+|---------|---------|------------------|
+| WiFi AP | ✅ | ✅ |
+| ELM327 Protocol | ✅ | ✅ |
+| Web Dashboard | ✅ | ✅ |
+| Bluetooth LE | ❌ | ✅ |
+| TFT Display | ❌ | ✅ |
+| Flash Size | 1MB | 8MB |
+| RAM | ~50KB | 512KB |
+| Max WiFi Clients | 2 | 4 |
+| PSRAM | ❌ | ✅ |
+
 ## Memory Optimization
 
-The code is optimized for ESP-01S's limited resources:
+### ESP-01S (Size-Optimized)
 - Compiled with `-Os` (optimize for size)
 - PROGMEM storage for HTML/strings
-- Minimal buffer sizes
+- Minimal buffer sizes (256 bytes)
 - Function/data section garbage collection
 - Low-memory LWIP configuration
+
+### ESP32-S3 (Performance-Optimized)
+- Compiled with `-O2` (optimize for performance)
+- Larger buffers (512 bytes) for better responsiveness
+- PSRAM support for additional memory
+- Enhanced WebSocket capabilities
 
 ## Troubleshooting
 
