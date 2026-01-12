@@ -6,7 +6,7 @@
 #define WIFI_SSID_PREFIX "iCAR_PRO_"
 #define WIFI_PASSWORD ""  // vGate iCar Pro default: no password (open network)
 #define WIFI_CHANNEL 6
-#define MAX_CONNECTIONS 1
+#define MAX_CONNECTIONS 2
 
 // Network Configuration (vGate iCar Pro defaults)
 #define AP_IP_ADDRESS IPAddress(192, 168, 0, 10)
