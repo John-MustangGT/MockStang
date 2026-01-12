@@ -168,19 +168,24 @@ public:
 
             case DRIVE_NORMAL: {
                 // 0-80 km/h in 7s, cruise, then slow to stop
+                // Moderate driver adjustments - slower, smoother variations
+                float noisePhase = fmod(elapsedSec * 1.5, 6.28);  // ~4 second cycle
+                int8_t throttleNoise = (int8_t)(sin(noisePhase) * 3.0);  // +/- 3%
+                int8_t rpmNoise = (int8_t)(sin(noisePhase * 1.2) * 40);  // +/- 40 RPM
+
                 if (drivePhase == 0) {  // Acceleration
                     if (elapsedSec < 7.0) {
                         currentState.speed = (uint8_t)(elapsedSec * 11.4);  // 0-80 km/h
-                        currentState.rpm = 850 + (uint16_t)(elapsedSec * 500);  // 850-4350 RPM
-                        currentState.throttle = 50;
+                        currentState.rpm = 850 + (uint16_t)(elapsedSec * 500) + rpmNoise;  // 850-4350 RPM
+                        currentState.throttle = 50 + throttleNoise;
                     } else {
                         drivePhase = 1;
                     }
                 } else if (drivePhase == 1) {  // Cruise for 10s
                     if (elapsedSec < 17.0) {
                         currentState.speed = 80;
-                        currentState.rpm = 2500;
-                        currentState.throttle = 25;
+                        currentState.rpm = 2500 + rpmNoise;
+                        currentState.throttle = 25 + throttleNoise;
                     } else {
                         drivePhase = 2;
                     }
@@ -195,7 +200,7 @@ public:
                     }
                 } else {  // Stopped
                     currentState.speed = 0;
-                    currentState.rpm = 850;
+                    currentState.rpm = 850 + (rpmNoise / 2);  // Small idle fluctuation
                     currentState.throttle = 0;
                 }
                 currentState.maf = 200 + currentState.throttle * 8;
@@ -204,19 +209,24 @@ public:
 
             case DRIVE_SPORT: {
                 // 0-120 km/h in 8s, hard acceleration
+                // Aggressive driver - sharper, faster variations
+                float noisePhase = fmod(elapsedSec * 3.0, 6.28);  // ~2 second cycle (faster)
+                int8_t throttleNoise = (int8_t)(sin(noisePhase) * 5.0);  // +/- 5% (more aggressive)
+                int8_t rpmNoise = (int8_t)(sin(noisePhase * 1.4) * 80);  // +/- 80 RPM
+
                 if (drivePhase == 0) {  // Acceleration
                     if (elapsedSec < 8.0) {
                         currentState.speed = (uint8_t)(elapsedSec * 15);  // 0-120 km/h
-                        currentState.rpm = 1500 + (uint16_t)(elapsedSec * 625);  // 1500-6500 RPM
-                        currentState.throttle = 85;
+                        currentState.rpm = 1500 + (uint16_t)(elapsedSec * 625) + rpmNoise;  // 1500-6500 RPM
+                        currentState.throttle = 85 + throttleNoise;
                     } else {
                         drivePhase = 1;
                     }
                 } else if (drivePhase == 1) {  // Cruise for 8s
                     if (elapsedSec < 16.0) {
                         currentState.speed = 120;
-                        currentState.rpm = 3500;
-                        currentState.throttle = 40;
+                        currentState.rpm = 3500 + rpmNoise;
+                        currentState.throttle = 40 + throttleNoise;
                     } else {
                         drivePhase = 2;
                     }
@@ -231,7 +241,7 @@ public:
                     }
                 } else {  // Stopped
                     currentState.speed = 0;
-                    currentState.rpm = 850;
+                    currentState.rpm = 850 + rpmNoise;  // Even at idle, sporty engine fluctuates more
                     currentState.throttle = 0;
                 }
                 currentState.maf = 200 + currentState.throttle * 10;
@@ -240,17 +250,23 @@ public:
 
             case DRIVE_DRAG: {
                 // Drag race: 0-180 km/h in 12s flat out, then hard brake
+                // High frequency vibration at launch, then power delivery variations
+                float noisePhase = fmod(elapsedSec * 5.0, 6.28);  // ~1.2 second cycle (very fast)
+
                 if (drivePhase == 0) {  // Launch and acceleration
                     if (elapsedSec < 12.0) {
                         currentState.speed = (uint8_t)(elapsedSec * 15);  // 0-180 km/h
                         if (elapsedSec < 1.0) {
-                            // Launch - high RPM, slow speed
-                            currentState.rpm = 3000 + (uint16_t)(elapsedSec * 2000);  // 3000-5000 RPM
+                            // Launch - wheel spin, high frequency vibration
+                            int16_t launchNoise = (int16_t)(sin(noisePhase) * 200);  // +/- 200 RPM (wheel spin)
+                            currentState.rpm = 3000 + (uint16_t)(elapsedSec * 2000) + launchNoise;  // 3000-5000 RPM
+                            currentState.throttle = 100;  // Floored
                         } else {
-                            // Full acceleration
-                            currentState.rpm = 2000 + (uint16_t)((elapsedSec - 1.0) * 454);  // 2000-7000 RPM
+                            // Full acceleration - power delivery variations
+                            int16_t rpmNoise = (int16_t)(sin(noisePhase * 1.1) * 100);  // +/- 100 RPM
+                            currentState.rpm = 2000 + (uint16_t)((elapsedSec - 1.0) * 454) + rpmNoise;  // 2000-7000 RPM
+                            currentState.throttle = 100;  // Throttle pinned
                         }
-                        currentState.throttle = 100;
                     } else {
                         drivePhase = 1;
                     }
