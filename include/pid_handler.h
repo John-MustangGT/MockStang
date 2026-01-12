@@ -52,9 +52,9 @@ public:
                 // Bitmap of supported PIDs
                 // We support: 0x01, 0x03, 0x04, 0x05, 0x0C, 0x0D, 0x0F, 0x10, 0x11, 0x1F
                 data[0] = 0b10111000;  // 0x01, 0x03, 0x04, 0x05
-                data[1] = 0b00011110;  // 0x0C, 0x0D, 0x0F, 0x10, 0x11
-                data[2] = 0b10000000;  // 0x1F
-                data[3] = 0b00000001;  // 0x20 (supports next range)
+                data[1] = 0b00011011;  // 0x0C, 0x0D, 0x0F, 0x10
+                data[2] = 0b10000000;  // 0x11
+                data[3] = 0b00000011;  // 0x1F, 0x20 (supports next range)
                 dataLen = 4;
                 break;
 
@@ -125,9 +125,9 @@ public:
 
             case 0x20:  // PIDs supported [21-40]
                 data[0] = 0b10000000;  // 0x21 supported
-                data[1] = 0b00000000;
-                data[2] = 0b00001000;  // 0x2F supported
-                data[3] = 0b00010001;  // 0x33 supported, 0x40 supported
+                data[1] = 0b00000010;  // 0x2F supported
+                data[2] = 0b00100000;  // 0x33 supported
+                data[3] = 0b00000001;  // 0x40 supported
                 dataLen = 4;
                 break;
 
