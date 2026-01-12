@@ -161,7 +161,8 @@ public:
 
         if (headers) {
             // Add CAN header (7E8 is typical ECU response)
-            response = "7E8 ";
+            response = "7E8";
+            if (spaces) response += " ";
 
             // Add length byte (mode + PID + data bytes)
             uint8_t length = 2 + dataLen;  // 1 byte mode + 1 byte PID + data
