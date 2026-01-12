@@ -117,7 +117,13 @@ public:
         }
         else if (cmd == "ATDPN" || cmd == "ATDP") {
             // Describe current protocol
-            return response + "AUTO, ISO 15765-4 (CAN 11/500)\r\r>";
+            // Don't include "AUTO, " prefix - that suggests protocol not confirmed
+            // We always report as successfully detected CAN protocol
+            if (cmd == "ATDPN") {
+                return response + "6\r\r>";  // Protocol number for ISO 15765-4 CAN 11/500
+            } else {
+                return response + "ISO 15765-4 (CAN 11/500)\r\r>";
+            }
         }
         else if (cmd == "ATAT0" || cmd == "ATAT1" || cmd == "ATAT2") {
             // Adaptive timing
