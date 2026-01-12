@@ -157,14 +157,19 @@ public:
     // Format OBD response with proper spacing and headers
     String formatOBDResponse(uint8_t mode, uint8_t pid, uint8_t* data, uint8_t dataLen) {
         String response = "";
+        char buf[4];
 
         if (headers) {
-            // Add CAN header (simplified - 7E8 is typical ECU response)
+            // Add CAN header (7E8 is typical ECU response)
             response = "7E8 ";
+
+            // Add length byte (mode + PID + data bytes)
+            uint8_t length = 2 + dataLen;  // 1 byte mode + 1 byte PID + data
+            formatHexByte(buf, length, spaces);
+            response += buf;
         }
 
         // Add response mode (request mode + 0x40)
-        char buf[4];
         formatHexByte(buf, mode + 0x40, spaces);
         response += buf;
 
