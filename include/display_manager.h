@@ -40,28 +40,31 @@ public:
     void begin() {
         Serial.println("Initializing display...");
 
-        // Initialize SPI explicitly for ESP32-S3 TFT Feather
-        SPI.begin();
-
         // Configure backlight pin but keep it off during init
         pinMode(TFT_BACKLIGHT, OUTPUT);
         digitalWrite(TFT_BACKLIGHT, LOW);
 
-        // Small delay before display init
-        delay(100);
+        // Small delay for power stabilization
+        delay(200);
 
-        // Initialize display (240x135 ST7789)
-        tft->init(135, 240);  // Height, Width for this display
+        // Initialize display
+        // ST7789 135x240 display on ESP32-S3 TFT Feather
+        // Note: Library expects (height, width) as (135, 240)
+        tft->init(135, 240, SPI_MODE0);
+
+        // Set rotation (3 = landscape with USB on left)
         tft->setRotation(DISPLAY_ROTATION);
 
-        // Clear screen
+        // Clear screen to black
         tft->fillScreen(COLOR_BG);
 
-        // Turn on backlight after initialization
-        delay(50);
+        // Small delay before turning on backlight
+        delay(100);
+
+        // Turn on backlight
         digitalWrite(TFT_BACKLIGHT, HIGH);
 
-        Serial.println("Display initialized");
+        Serial.println("Display initialized successfully");
     }
 
     void showSplash() {

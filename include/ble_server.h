@@ -50,14 +50,19 @@ private:
             parent->connectedClients++;
             Serial.printf("BLE Client connected (total: %d)\n", parent->connectedClients);
 
-            // Send initial ELM327 greeting (required by OBD apps)
-            if (parent->pOBDCharacteristic) {
-                parent->pOBDCharacteristic->setValue("ELM327 v1.5\r\r>");
-                parent->pOBDCharacteristic->notify();
-            }
-
             // Update connection parameters for lower latency
             pServer->updateConnParams(desc->conn_handle, 24, 48, 0, 60);
+
+            // Small delay to let connection stabilize
+            delay(100);
+
+            // Send initial ELM327 greeting (required by OBD apps)
+            if (parent->pOBDCharacteristic) {
+                String greeting = "ELM327 v1.5\r\r>";
+                parent->pOBDCharacteristic->setValue(greeting.c_str());
+                parent->pOBDCharacteristic->notify();
+                Serial.println("BLE: Sent greeting to client");
+            }
         }
 
         void onDisconnect(NimBLEServer* pServer) {
@@ -115,7 +120,7 @@ public:
     void begin() {
         Serial.println("Initializing BLE (Vgate/Vlinker Profile)...");
 
-        // Initialize NimBLE
+        // Initialize NimBLE with minimal configuration
         NimBLEDevice::init(BLE_DEVICE_NAME);
         NimBLEDevice::setPower(ESP_PWR_LVL_P9); // Max power for better range
         NimBLEDevice::setMTU(512);  // Larger MTU for better throughput
@@ -143,67 +148,20 @@ public:
         pOBDService->start();
 
         // ========================================
-        // Device Information Service (DIS)
-        // ========================================
-        NimBLEService* pDISService = pServer->createService(BLE_DIS_SERVICE_UUID);
-
-        // Manufacturer Name
-        NimBLECharacteristic* pManufacturerChar = pDISService->createCharacteristic(
-            BLE_DIS_MANUFACTURER_UUID,
-            NIMBLE_PROPERTY::READ
-        );
-        pManufacturerChar->setValue(BLE_MANUFACTURER);
-
-        // Model Number
-        NimBLECharacteristic* pModelChar = pDISService->createCharacteristic(
-            BLE_DIS_MODEL_UUID,
-            NIMBLE_PROPERTY::READ
-        );
-        pModelChar->setValue(BLE_MODEL_NUMBER);
-
-        // Serial Number
-        NimBLECharacteristic* pSerialChar = pDISService->createCharacteristic(
-            BLE_DIS_SERIAL_UUID,
-            NIMBLE_PROPERTY::READ
-        );
-        pSerialChar->setValue(BLE_SERIAL_NUMBER);
-
-        // Firmware Revision
-        NimBLECharacteristic* pFirmwareChar = pDISService->createCharacteristic(
-            BLE_DIS_FIRMWARE_UUID,
-            NIMBLE_PROPERTY::READ
-        );
-        pFirmwareChar->setValue(BLE_FIRMWARE_VERSION);
-
-        // Hardware Revision
-        NimBLECharacteristic* pHardwareChar = pDISService->createCharacteristic(
-            BLE_DIS_HARDWARE_UUID,
-            NIMBLE_PROPERTY::READ
-        );
-        pHardwareChar->setValue(BLE_HARDWARE_VERSION);
-
-        // Software Revision
-        NimBLECharacteristic* pSoftwareChar = pDISService->createCharacteristic(
-            BLE_DIS_SOFTWARE_UUID,
-            NIMBLE_PROPERTY::READ
-        );
-        pSoftwareChar->setValue(BLE_SOFTWARE_VERSION);
-
-        // Start DIS service
-        pDISService->start();
-
-        // ========================================
-        // Start Advertising
+        // Start Advertising (ONLY the OBD service)
         // ========================================
         NimBLEAdvertising* pAdvertising = NimBLEDevice::getAdvertising();
 
-        // Advertise main OBD service
+        // Clear any default advertising data
+        pAdvertising->reset();
+
+        // Only advertise the OBD service UUID
         pAdvertising->addServiceUUID(BLE_SERVICE_UUID);
 
-        // Also advertise Device Information Service
-        pAdvertising->addServiceUUID(BLE_DIS_SERVICE_UUID);
+        // Set device name in advertising
+        pAdvertising->setName(BLE_DEVICE_NAME);
 
-        // Enable scan response for more data
+        // Enable scan response to fit more data
         pAdvertising->setScanResponse(true);
 
         // Connection interval preferences (for iOS compatibility)
@@ -216,9 +174,7 @@ public:
         Serial.printf("BLE server started:\n");
         Serial.printf("  Device Name: %s\n", BLE_DEVICE_NAME);
         Serial.printf("  OBD Service: %s\n", BLE_SERVICE_UUID);
-        Serial.printf("  DIS Service: %s\n", BLE_DIS_SERVICE_UUID);
-        Serial.printf("  Manufacturer: %s\n", BLE_MANUFACTURER);
-        Serial.printf("  Model: %s\n", BLE_MODEL_NUMBER);
+        Serial.printf("  Characteristic: %s\n", BLE_CHAR_UUID);
         Serial.println("Ready for BLE connections...");
     }
 
