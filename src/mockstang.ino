@@ -47,6 +47,10 @@ String inputBuffer = "";
 unsigned long lastStateBroadcast = 0;
 #define STATE_BROADCAST_INTERVAL 200  // Broadcast state every 200ms during driving simulation
 
+// Stats broadcast timing
+unsigned long lastStatsBroadcast = 0;
+#define STATS_BROADCAST_INTERVAL 1000  // Broadcast stats every 1 second
+
 void setup() {
     Serial.begin(115200);
     delay(100);
@@ -165,6 +169,9 @@ void loop() {
                 Serial.printf("ELM327 client connected from %s\n",
                              elm327Client.remoteIP().toString().c_str());
 
+                // Track connection statistics
+                webServer->trackConnection(elm327Client.remoteIP().toString());
+
                 // Send initial prompt
                 elm327Client.print("ELM327 v1.5\r\r>");
             }
@@ -198,6 +205,9 @@ void loop() {
         elm327Client.stop();
         clientConnected = false;
         inputBuffer = "";
+
+        // Track disconnection
+        webServer->trackDisconnection();
     }
 
     // Handle WebSocket messages for parameter updates
@@ -220,6 +230,13 @@ void loop() {
         }
     }
 
+    // Broadcast connection statistics periodically
+    unsigned long now = millis();
+    if (now - lastStatsBroadcast >= STATS_BROADCAST_INTERVAL) {
+        webServer->broadcastStats();
+        lastStatsBroadcast = now;
+    }
+
     delay(1);  // Small delay to prevent watchdog timer issues
 }
 
@@ -229,6 +246,9 @@ void processCommand(String command) {
     if (command.length() == 0) {
         return;
     }
+
+    // Track command statistics
+    webServer->trackCommand(command);
 
     #if ENABLE_SERIAL_LOGGING
         Serial.printf("CMD: %s\n", command.c_str());
@@ -248,6 +268,9 @@ void processCommand(String command) {
 
     // Send response to client
     elm327Client.print(response);
+
+    // Track response
+    webServer->trackResponse();
 
     #if ENABLE_SERIAL_LOGGING
         Serial.printf("RESP: %s\n", response.c_str());

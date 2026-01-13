@@ -7,6 +7,26 @@
 #include "pid_handler.h"
 #include "config_manager.h"
 
+// Connection statistics
+struct ConnectionStats {
+    uint32_t totalConnections;       // Total connections since boot
+    uint32_t totalCommands;           // Total commands received
+    uint32_t totalResponses;          // Total responses sent
+    uint32_t commandsPerMinute;       // Commands in last minute
+    unsigned long lastCommandTime;    // Timestamp of last command
+    unsigned long sessionStartTime;   // Current session start time
+    unsigned long uptime;             // System uptime in seconds
+    String lastCommand;               // Last command received
+    String clientIP;                  // Current client IP address
+    bool clientConnected;             // Is a client currently connected?
+
+    // Command frequency tracking
+    uint32_t mode01Count;             // Mode 01 queries
+    uint32_t mode03Count;             // Mode 03 queries
+    uint32_t mode09Count;             // Mode 09 queries
+    uint32_t atCommandCount;          // AT commands
+};
+
 class WebServer {
 private:
     AsyncWebServer* server;
@@ -14,6 +34,7 @@ private:
     PIDHandler* pidHandler;
     ConfigManager* configManager;
     static WebServer* instance;  // For static callback
+    ConnectionStats stats;  // Connection statistics
 
     // WebSocket event handler
     static void onWebSocketEvent(AsyncWebSocket *server, AsyncWebSocketClient *client,
@@ -43,6 +64,22 @@ public:
         instance = this;  // Set static instance for callback
         server = new AsyncWebServer(WEB_SERVER_PORT);
         ws = new AsyncWebSocket("/ws");
+
+        // Initialize statistics
+        stats.totalConnections = 0;
+        stats.totalCommands = 0;
+        stats.totalResponses = 0;
+        stats.commandsPerMinute = 0;
+        stats.lastCommandTime = 0;
+        stats.sessionStartTime = 0;
+        stats.uptime = 0;
+        stats.lastCommand = "";
+        stats.clientIP = "";
+        stats.clientConnected = false;
+        stats.mode01Count = 0;
+        stats.mode03Count = 0;
+        stats.mode09Count = 0;
+        stats.atCommandCount = 0;
     }
 
     void begin() {
@@ -367,6 +404,80 @@ public:
     }
 
     AsyncWebSocket* getWebSocket() { return ws; }
+
+    // Connection statistics tracking
+    void trackConnection(String ip) {
+        stats.totalConnections++;
+        stats.clientIP = ip;
+        stats.clientConnected = true;
+        stats.sessionStartTime = millis();
+    }
+
+    void trackDisconnection() {
+        stats.clientConnected = false;
+        stats.clientIP = "";
+    }
+
+    void trackCommand(String command) {
+        stats.totalCommands++;
+        stats.lastCommandTime = millis();
+        stats.lastCommand = command;
+
+        // Track command types
+        if (command.startsWith("01")) {
+            stats.mode01Count++;
+        } else if (command.startsWith("03")) {
+            stats.mode03Count++;
+        } else if (command.startsWith("09")) {
+            stats.mode09Count++;
+        } else if (command.startsWith("AT") || command.startsWith("at")) {
+            stats.atCommandCount++;
+        }
+    }
+
+    void trackResponse() {
+        stats.totalResponses++;
+    }
+
+    void updateStats() {
+        // Update uptime
+        stats.uptime = millis() / 1000;
+
+        // Calculate commands per minute (rough estimate)
+        if (stats.sessionStartTime > 0 && stats.clientConnected) {
+            unsigned long sessionDuration = (millis() - stats.sessionStartTime) / 1000;  // seconds
+            if (sessionDuration > 0) {
+                stats.commandsPerMinute = (stats.totalCommands * 60) / sessionDuration;
+            }
+        } else {
+            stats.commandsPerMinute = 0;
+        }
+    }
+
+    // Broadcast statistics to web dashboard
+    void broadcastStats() {
+        if (ws->count() > 0) {
+            updateStats();
+
+            String json = "{\"type\":\"stats\",";
+            json += "\"totalConnections\":" + String(stats.totalConnections) + ",";
+            json += "\"totalCommands\":" + String(stats.totalCommands) + ",";
+            json += "\"totalResponses\":" + String(stats.totalResponses) + ",";
+            json += "\"commandsPerMinute\":" + String(stats.commandsPerMinute) + ",";
+            json += "\"uptime\":" + String(stats.uptime) + ",";
+            json += "\"lastCommand\":\"" + jsonEscape(stats.lastCommand) + "\",";
+            json += "\"clientIP\":\"" + stats.clientIP + "\",";
+            json += "\"clientConnected\":" + String(stats.clientConnected ? "true" : "false") + ",";
+            json += "\"mode01Count\":" + String(stats.mode01Count) + ",";
+            json += "\"mode03Count\":" + String(stats.mode03Count) + ",";
+            json += "\"mode09Count\":" + String(stats.mode09Count) + ",";
+            json += "\"atCommandCount\":" + String(stats.atCommandCount) + "}";
+
+            ws->textAll(json);
+        }
+    }
+
+    ConnectionStats getStats() { return stats; }
 
 private:
     // Escape special characters for JSON
