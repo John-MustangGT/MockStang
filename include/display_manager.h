@@ -40,6 +40,9 @@ public:
     void begin() {
         Serial.println("Initializing display...");
 
+        // Initialize SPI bus
+        SPI.begin();
+
         // Configure backlight pin but keep it off during init
         pinMode(TFT_BACKLIGHT, OUTPUT);
         digitalWrite(TFT_BACKLIGHT, LOW);
