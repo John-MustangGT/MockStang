@@ -2,7 +2,14 @@
 #define WEB_SERVER_H
 
 #include <ESPAsyncWebServer.h>
-#include <ESPAsyncTCP.h>
+
+// Platform-specific async TCP library
+#ifdef ESP01_BUILD
+    #include <ESPAsyncTCP.h>
+#elif defined(ESP32_BUILD)
+    #include <AsyncTCP.h>
+#endif
+
 #include "web_interface.h"
 #include "pid_handler.h"
 #include "config_manager.h"
