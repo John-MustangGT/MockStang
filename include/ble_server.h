@@ -50,6 +50,12 @@ private:
             parent->connectedClients++;
             Serial.printf("BLE Client connected (total: %d)\n", parent->connectedClients);
 
+            // Send initial ELM327 greeting (required by OBD apps)
+            if (parent->pOBDCharacteristic) {
+                parent->pOBDCharacteristic->setValue("ELM327 v1.5\r\r>");
+                parent->pOBDCharacteristic->notify();
+            }
+
             // Update connection parameters for lower latency
             pServer->updateConnParams(desc->conn_handle, 24, 48, 0, 60);
         }
