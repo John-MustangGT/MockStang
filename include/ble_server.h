@@ -119,7 +119,9 @@ public:
             return;
         }
 
-        Serial.printf("BLE CMD: %s\n", command.c_str());
+        #if ENABLE_SERIAL_LOGGING
+            Serial.printf("BLE CMD: %s\n", command.c_str());
+        #endif
 
         String response;
 
@@ -138,7 +140,9 @@ public:
         if (deviceConnected && pTxCharacteristic) {
             pTxCharacteristic->setValue(response.c_str());
             pTxCharacteristic->notify();
-            Serial.printf("BLE RESP: %s\n", response.c_str());
+            #if ENABLE_SERIAL_LOGGING
+                Serial.printf("BLE RESP: %s\n", response.c_str());
+            #endif
         }
     }
 

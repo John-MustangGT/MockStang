@@ -146,6 +146,29 @@ function initWebSocket(){
     var log=document.getElementById('log');
     var msg=JSON.parse(e.data);
     var now=new Date().toLocaleTimeString();
+
+    // Handle state updates from driving simulator
+    if(msg.type==='state'){
+      document.getElementById('rpm').value=msg.rpm;
+      document.getElementById('rpmVal').innerText=msg.rpm;
+      document.getElementById('speed').value=msg.speed;
+      document.getElementById('speedVal').innerText=msg.speed;
+      document.getElementById('coolant').value=msg.coolant;
+      document.getElementById('coolantVal').innerText=msg.coolant;
+      document.getElementById('intake').value=msg.intake;
+      document.getElementById('intakeVal').innerText=msg.intake;
+      document.getElementById('throttle').value=msg.throttle;
+      document.getElementById('throttleVal').innerText=msg.throttle;
+      document.getElementById('maf').value=msg.maf;
+      document.getElementById('mafVal').innerText=(msg.maf/100).toFixed(2);
+      document.getElementById('fuel').value=msg.fuel;
+      document.getElementById('fuelVal').innerText=msg.fuel;
+      document.getElementById('baro').value=msg.baro;
+      document.getElementById('baroVal').innerText=msg.baro;
+      return;
+    }
+
+    // Handle command/response logs
     if(msg.cmd){
       log.innerHTML+='<span class="log-time">['+now+']</span> <span class="log-cmd">← '+msg.cmd+'</span><br>';
     }

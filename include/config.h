@@ -30,6 +30,9 @@
 #endif
 #define ELM_VOLTAGE "12.8V"  // Simulated car voltage
 
+// Serial Debugging
+#define ENABLE_SERIAL_LOGGING true  // Enable/disable CMD/RESP logging to serial
+
 // Maximum number of stored DTCs
 #define MAX_DTCS 8
 

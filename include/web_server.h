@@ -219,6 +219,22 @@ public:
         }
     }
 
+    // Broadcast current state to all connected WebSocket clients (for driving simulator)
+    void broadcastState(CarState state) {
+        if (ws->count() > 0) {
+            String json = "{\"type\":\"state\",";
+            json += "\"rpm\":" + String(state.rpm) + ",";
+            json += "\"speed\":" + String(state.speed) + ",";
+            json += "\"coolant\":" + String(state.coolant_temp) + ",";
+            json += "\"intake\":" + String(state.intake_temp) + ",";
+            json += "\"throttle\":" + String(state.throttle) + ",";
+            json += "\"maf\":" + String(state.maf) + ",";
+            json += "\"fuel\":" + String(state.fuel_level) + ",";
+            json += "\"baro\":" + String(state.barometric) + "}";
+            ws->textAll(json);
+        }
+    }
+
     // Parse DTC string (e.g., "P0420") to 16-bit code
     // Format: First 2 bits = type (P0/P2/P3=00, P1=01, C=10, B=11)
     //         Next 2 bits = first digit

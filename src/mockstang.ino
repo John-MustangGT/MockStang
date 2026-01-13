@@ -43,6 +43,10 @@ ConfigManager* configManager;
 bool clientConnected = false;
 String inputBuffer = "";
 
+// State broadcast timing
+unsigned long lastStateBroadcast = 0;
+#define STATE_BROADCAST_INTERVAL 200  // Broadcast state every 200ms during driving simulation
+
 void setup() {
     Serial.begin(115200);
     delay(100);
@@ -207,6 +211,15 @@ void loop() {
     // Update driving simulator
     pidHandler->updateDrivingSimulator();
 
+    // Broadcast state updates during driving simulation
+    if (pidHandler->getDriveMode() != DRIVE_OFF) {
+        unsigned long now = millis();
+        if (now - lastStateBroadcast >= STATE_BROADCAST_INTERVAL) {
+            webServer->broadcastState(pidHandler->getState());
+            lastStateBroadcast = now;
+        }
+    }
+
     delay(1);  // Small delay to prevent watchdog timer issues
 }
 
@@ -217,7 +230,9 @@ void processCommand(String command) {
         return;
     }
 
-    Serial.printf("CMD: %s\n", command.c_str());
+    #if ENABLE_SERIAL_LOGGING
+        Serial.printf("CMD: %s\n", command.c_str());
+    #endif
 
     String response;
 
@@ -234,7 +249,9 @@ void processCommand(String command) {
     // Send response to client
     elm327Client.print(response);
 
-    Serial.printf("RESP: %s\n", response.c_str());
+    #if ENABLE_SERIAL_LOGGING
+        Serial.printf("RESP: %s\n", response.c_str());
+    #endif
 
     // Broadcast to web interface
     webServer->broadcastOBDActivity(command, response);
