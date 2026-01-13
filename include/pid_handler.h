@@ -461,7 +461,7 @@ public:
 
     // Handle OBD-II mode 09 request (vehicle information)
     String handleMode09(uint8_t pid) {
-        char buf[8];
+        char buf[16];  // Increased buffer size to handle spaced output
         String response = "";
 
         switch (pid) {
