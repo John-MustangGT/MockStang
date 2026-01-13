@@ -32,7 +32,7 @@ WebServer* webServer;
 ConfigManager* configManager;
 
 #if ENABLE_BLE
-    BLEServer* bleServer;
+    BLEOBDServer* bleServer;
 #endif
 
 #if ENABLE_DISPLAY
@@ -126,9 +126,8 @@ void setup() {
 
     #if ENABLE_BLE
         // Initialize BLE server (ESP32 only)
-        bleServer = new BLEServer(pidHandler, configManager);
+        bleServer = new BLEOBDServer(pidHandler, configManager, &elm327);
         bleServer->begin();
-        Serial.println("BLE server started and advertising");
     #endif
 
     Serial.println("\n=================================");
