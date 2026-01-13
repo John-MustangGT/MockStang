@@ -247,9 +247,42 @@ MockStang/
 │   └── web_interface.h       # Embedded HTML/JS dashboard (main + settings)
 ├── src/
 │   └── mockstang.ino         # Main application
+├── tools/
+│   └── ble-scanner/          # BLE GATT scanner for ELM327 adapters
 ├── platformio.ini            # PlatformIO configuration
 └── README.md                 # This file
 ```
+
+## BLE Scanner Tool
+
+MockStang includes a **BLE GATT scanner** tool for discovering the service and characteristic UUIDs used by real ELM327 BLE adapters. Different BLE OBD-II adapters use different UUIDs, so this tool helps you:
+
+- 🔍 **Discover** BLE OBD-II adapters (Vgate iCar BLE, generic ELM327 BLE, etc.)
+- 🔌 **Connect** and enumerate all GATT services and characteristics
+- 📋 **Dump** complete UUID mappings with properties (READ, WRITE, NOTIFY)
+- 🎯 **Identify** which characteristics handle UART-style RX/TX for ELM327 commands
+
+### Hardware
+
+The BLE scanner runs on the **Adafruit Feather ESP32-S3 Reverse TFT**, which features:
+- ESP32-S3 with BLE 5.0
+- 1.14" color TFT display (240x135)
+- 3 user buttons for control
+- USB-C for power and serial output
+
+### Quick Start
+
+```bash
+cd tools/ble-scanner
+pio run --target upload
+```
+
+Once uploaded:
+1. Press **Button A** to start scanning
+2. Use **Button C** to navigate devices
+3. Press **Button B** to connect and enumerate UUIDs
+
+See [tools/ble-scanner/README.md](tools/ble-scanner/README.md) for complete documentation.
 
 ## Memory Optimization
 
