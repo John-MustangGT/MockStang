@@ -53,7 +53,7 @@ public:
         // Initialize display
         // ST7789 135x240 display on ESP32-S3 TFT Feather
         // Note: Library expects (height, width) as (135, 240)
-        tft->init(135, 240, SPI_MODE0);
+        tft->init(135, 240);
 
         // Set rotation (3 = landscape with USB on left)
         tft->setRotation(DISPLAY_ROTATION);
