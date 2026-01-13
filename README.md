@@ -6,15 +6,19 @@ A multi-platform OBD-II adapter emulator that mimics the vGate iCar Pro WiFi ada
 
 ### Common Features (All Platforms)
 - **ELM327 v1.5 Protocol Emulation** - Full AT command support
+- **27 Mode 01 PIDs** - Comprehensive vehicle data (RPM, speed, temps, fuel trim, MAP, timing advance, O2 sensors, battery voltage, oil temp, etc.)
 - **WiFi Access Point Mode** - Emulates vGate iCar Pro WiFi adapter
 - **Real-time Web Dashboard** - Monitor and control mock data via browser
-- **WebSocket Updates** - Live command/response monitoring
+- **Connection Statistics Dashboard** - Real-time monitoring of OBD-II app behavior (commands/min, command breakdown, client tracking)
+- **WebSocket Updates** - Live command/response monitoring and state updates
 - **Adjustable PIDs** - Modify car parameters on-the-fly with sliders
+- **Live Dashboard Updates** - Sliders automatically update during driving simulation
 - **Persistent Configuration** - EEPROM-based settings storage
 - **Web-Based Settings** - Configure network, VIN, and defaults via browser
-- **Driving Simulator** - 4 aggressiveness levels (Gentle, Normal, Sport, Drag Race)
-- **MIL/DTC Management** - Check engine light and diagnostic trouble codes
+- **Driving Simulator** - 4 aggressiveness levels with realistic noise (Gentle, Normal, Sport, Drag Race)
+- **MIL/DTC Management** - Check engine light and diagnostic trouble codes (up to 8 DTCs)
 - **Mode 09 Support** - VIN and ECU name queries
+- **Optional Serial Logging** - Configurable CMD/RESP logging to serial monitor
 
 ### ESP32-S3 Exclusive Features
 - **Bluetooth Low Energy (BLE)** - Peripheral mode for wireless OBD-II apps
@@ -26,34 +30,72 @@ A multi-platform OBD-II adapter emulator that mimics the vGate iCar Pro WiFi ada
 ### ESP-01S (WiFi Only)
 - **ESP-01S** (1MB flash recommended)
 - **USB to Serial adapter** (for programming)
-- **3.3V power supply**
+- **3.3V power supply** (⚠️ NOT 5V!)
 
 ### ESP32-S3 Feather (WiFi + BLE + Display)
 - **Adafruit ESP32-S3 Reverse TFT Feather** (includes 240x135 display)
 - **USB-C cable** (for programming and power)
 - Built-in battery charging and display
 
+📦 **See [BOM.md](BOM.md) for complete parts list with purchase links and assembly instructions.**
+
 ## Supported OBD-II PIDs
 
-### Core PIDs
-- `0x0C` - Engine RPM
-- `0x0D` - Vehicle Speed (km/h)
-- `0x05` - Engine Coolant Temperature (°C)
-- `0x0F` - Intake Air Temperature (°C)
-- `0x11` - Throttle Position (%)
-- `0x10` - MAF Air Flow Rate (g/s)
-- `0x1F` - Run Time Since Engine Start (s)
-- `0x2F` - Fuel Tank Level (%)
-- `0x33` - Barometric Pressure (kPa)
-- `0x21` - Distance Traveled with MIL On (km)
+MockStang supports **27 Mode 01 PIDs**, providing comprehensive vehicle data simulation for testing OBD-II applications.
 
-### Mandatory PIDs
-- `0x00` - PIDs supported [01-20]
-- `0x01` - Monitor status since DTCs cleared
-- `0x03` - Fuel system status
-- `0x04` - Calculated engine load value
-- `0x20` - PIDs supported [21-40]
-- `0x40` - PIDs supported [41-60]
+### Engine & Performance (9 PIDs)
+- `0x0C` - Engine RPM
+- `0x04` - Calculated Engine Load
+- `0x0E` - Timing Advance
+- `0x1F` - Run Time Since Engine Start
+- `0x11` - Throttle Position
+- `0x45` - Relative Throttle Position
+- `0x0D` - Vehicle Speed (km/h)
+- `0x5C` - Engine Oil Temperature
+- `0x51` - Fuel Type
+
+### Temperature Sensors (4 PIDs)
+- `0x05` - Engine Coolant Temperature
+- `0x0F` - Intake Air Temperature
+- `0x46` - Ambient Air Temperature
+- `0x5C` - Engine Oil Temperature
+
+### Fuel System (5 PIDs)
+- `0x03` - Fuel System Status
+- `0x06` - Short Term Fuel Trim Bank 1
+- `0x07` - Long Term Fuel Trim Bank 1
+- `0x10` - MAF Air Flow Rate (g/s)
+- `0x2F` - Fuel Tank Level
+
+### Air & Pressure (3 PIDs)
+- `0x0B` - Intake Manifold Pressure (MAP)
+- `0x33` - Barometric Pressure
+- `0x23` - Fuel Rail Pressure
+
+### Oxygen Sensors (2 PIDs)
+- `0x13` - O2 Sensors Present
+- `0x14` - O2 Sensor 1 (Bank 1, Sensor 1) - Voltage + Fuel Trim
+
+### Emissions & EGR (1 PID)
+- `0x2C` - Commanded EGR
+
+### Electrical (1 PID)
+- `0x42` - Control Module Voltage (Battery)
+
+### Diagnostics (4 PIDs)
+- `0x01` - Monitor Status Since DTCs Cleared (includes MIL status)
+- `0x21` - Distance Traveled with MIL On
+- `0x31` - Distance Since Codes Cleared
+- Mode 03 - Read DTCs, Mode 04 - Clear DTCs, Mode 07 - Pending DTCs
+
+### Support Bitmaps (3 PIDs)
+- `0x00` - PIDs Supported [01-20]
+- `0x20` - PIDs Supported [21-40]
+- `0x40` - PIDs Supported [41-60]
+
+**Mode 09 (Vehicle Information):**
+- `0x02` - VIN (Vehicle Identification Number)
+- `0x0A` - ECU Name
 
 ## Installation
 
@@ -284,17 +326,17 @@ MockStang/
 │   ├── config.h              # Compile-time configuration and defaults
 │   ├── config_manager.h      # EEPROM-based runtime configuration
 │   ├── elm327_protocol.h     # ELM327 AT command parser
-│   ├── pid_handler.h         # OBD-II PID response engine
-│   ├── web_server.h          # HTTP & WebSocket server
+│   ├── pid_handler.h         # OBD-II PID response engine (27 PIDs)
+│   ├── web_server.h          # HTTP & WebSocket server + connection stats
 │   ├── web_interface.h       # Embedded HTML/JS dashboard (main + settings)
 │   ├── ble_server.h          # BLE peripheral implementation (ESP32 only)
 │   └── display_manager.h     # TFT display manager (ESP32 only)
 ├── src/
 │   └── mockstang.ino         # Main application with conditional compilation
 ├── platformio.ini            # Multi-platform build configuration
-├── docs/
-│   ├── USER_MANUAL.md        # Comprehensive user guide
-│   └── TODO.md               # Feature roadmap
+├── BOM.md                    # Bill of Materials with purchase links
+├── USER_MANUAL.md            # Comprehensive user guide
+├── TODO.md                   # Feature roadmap
 └── README.md                 # This file
 ```
 
