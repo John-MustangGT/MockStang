@@ -1,7 +1,7 @@
 # MockStang User Manual
 
-**Version 1.0**
-WiFi OBD-II Emulator for ESP-01/ESP-01S
+**Version 1.1**
+WiFi/BLE OBD-II Emulator for ESP-01S and ESP32-S3
 
 ---
 
@@ -12,27 +12,32 @@ WiFi OBD-II Emulator for ESP-01/ESP-01S
 3. [Initial Setup](#initial-setup)
 4. [Connecting to MockStang](#connecting-to-mockstang)
 5. [Web Dashboard](#web-dashboard)
-6. [Driving Simulator](#driving-simulator)
-7. [MIL & Diagnostic Codes](#mil--diagnostic-codes)
-8. [Manual Parameter Control](#manual-parameter-control)
-9. [Settings & Configuration](#settings--configuration)
-10. [OBD-II Protocol Support](#obd-ii-protocol-support)
-11. [Troubleshooting](#troubleshooting)
+6. [Connection Statistics](#connection-statistics)
+7. [Driving Simulator](#driving-simulator)
+8. [MIL & Diagnostic Codes](#mil--diagnostic-codes)
+9. [Manual Parameter Control](#manual-parameter-control)
+10. [Settings & Configuration](#settings--configuration)
+11. [OBD-II Protocol Support](#obd-ii-protocol-support)
+12. [Troubleshooting](#troubleshooting)
 
 ---
 
 ## Introduction
 
-MockStang is a WiFi-based OBD-II emulator that mimics the behavior of a vGate iCar Pro adapter. It's designed for testing and developing OBD-II applications without needing a real vehicle.
+MockStang is a multi-platform OBD-II emulator that mimics the behavior of a vGate iCar Pro adapter. It supports both ESP-01S (WiFi only) and ESP32-S3 (WiFi + BLE + Display). It's designed for testing and developing OBD-II applications without needing a real vehicle.
 
 **Key Features:**
-- 🚗 Realistic driving simulator with 4 aggressiveness levels
-- 🔧 Full ELM327 v1.5 protocol support
+- 🚗 Realistic driving simulator with 4 aggressiveness levels and live slider updates
+- 🔧 Full ELM327 v1.5 protocol support (27 Mode 01 PIDs)
 - 💡 MIL (Check Engine Light) and DTC management
-- 🌐 Web-based control dashboard
-- 📱 Support for 2 simultaneous WiFi connections
+- 🌐 Web-based control dashboard with real-time updates
+- 📊 Connection statistics dashboard to monitor OBD-II app behavior
+- 📱 Support for 2-4 simultaneous WiFi connections (platform dependent)
+- 📶 Bluetooth Low Energy (BLE) support on ESP32-S3
+- 📺 Real-time TFT display on ESP32-S3
 - 💾 Persistent configuration storage (EEPROM)
 - 🔄 Real-time parameter updates via WebSocket
+- 🔇 Optional serial logging (configurable)
 
 ---
 
@@ -145,6 +150,78 @@ The web dashboard provides real-time control and monitoring of MockStang. Access
 - Monitor connection status to ensure real-time updates
 - Use Reset Runtime when starting a new test session
 - Clear Log to remove old activity data
+
+---
+
+## Connection Statistics
+
+### Overview
+
+The Connection Statistics dashboard provides real-time insights into OBD-II application behavior. This is invaluable for understanding how third-party apps interact with MockStang.
+
+### Statistics Display
+
+#### OBD Client Status
+- **Connection Status**: Shows "Connected" (green) or "Disconnected" (gray)
+- **Client IP Address**: Displays IP of connected OBD-II application
+- Updates automatically when apps connect/disconnect
+
+#### System Metrics
+- **Uptime**: System runtime formatted as hours/minutes/seconds
+- **Total Commands**: Count of all commands received since boot
+- **Commands/Min**: Live calculation of polling rate during active sessions
+- Auto-calculates based on session duration
+
+#### Command Breakdown
+
+Displays count of commands by type:
+- **Mode 01**: Current data PID queries (most common)
+- **Mode 03**: DTC read requests
+- **Mode 09**: Vehicle information requests (VIN, ECU name)
+- **AT Commands**: ELM327 configuration commands
+
+#### Last Command Display
+- Shows the most recent OBD-II command received
+- Useful for debugging and understanding app behavior
+- Updates in real-time
+
+### Understanding the Statistics
+
+**Commands Per Minute:**
+- **0-10**: Low activity - app is idle or querying infrequently
+- **10-30**: Normal logging - typical data logger behavior
+- **30-60**: High activity - aggressive polling or multiple PIDs
+- **60+**: Very high activity - may indicate performance app or rapid polling
+
+**Typical App Behavior:**
+1. **Connection Phase**: Burst of AT commands (ATRV, ATSP, etc.)
+2. **Discovery Phase**: Mode 01 PID 00, 20, 40 queries (supported PIDs)
+3. **Normal Operation**: Repeated Mode 01 queries for specific PIDs
+4. **VIN Query**: Occasional Mode 09 02 request
+5. **DTC Check**: Periodic Mode 03 requests
+
+**Command Type Distribution:**
+- **Heavy Mode 01**: Data logger or live dashboard app
+- **Many AT Commands**: App testing different protocols or configurations
+- **Mode 03 Queries**: Diagnostic or code reader app
+- **Mode 09 Requests**: App collecting vehicle information
+
+### Use Cases
+
+**Development Testing:**
+- Verify your app's polling rate isn't excessive
+- Identify which PIDs your app queries most frequently
+- Test connection/disconnection handling
+
+**Performance Analysis:**
+- Measure command throughput
+- Identify bottlenecks in OBD communication
+- Optimize polling intervals
+
+**Debugging:**
+- See exact command sequence during connection
+- Verify AT command initialization
+- Track down unexpected behavior
 
 ---
 
@@ -417,7 +494,9 @@ MockStang implements the following OBD-II modes:
 
 #### Mode 01: Current Data
 
-**Supported PIDs:**
+MockStang supports **27 Mode 01 PIDs**, providing comprehensive vehicle data simulation.
+
+**Core PIDs (01-20):**
 
 | PID | Description | Data Format |
 |-----|-------------|-------------|
@@ -426,17 +505,41 @@ MockStang implements the following OBD-II modes:
 | 0x03 | Fuel system status | Closed loop |
 | 0x04 | Calculated engine load | Percentage |
 | 0x05 | Engine coolant temperature | °C + 40 |
+| 0x06 | Short term fuel trim Bank 1 | -100% to +99% |
+| 0x07 | Long term fuel trim Bank 1 | -100% to +99% |
+| 0x0B | Intake manifold pressure (MAP) | kPa |
 | 0x0C | Engine RPM | RPM × 4 |
 | 0x0D | Vehicle speed | km/h |
+| 0x0E | Timing advance | Degrees before TDC |
 | 0x0F | Intake air temperature | °C + 40 |
 | 0x10 | MAF air flow rate | g/s × 100 |
 | 0x11 | Throttle position | Percentage |
+| 0x13 | O2 sensors present | Bitmap |
+| 0x14 | O2 Sensor 1 (Bank 1) | Voltage + fuel trim |
 | 0x1F | Run time since engine start | Seconds |
+
+**Extended PIDs (21-40):**
+
+| PID | Description | Data Format |
+|-----|-------------|-------------|
 | 0x20 | Supported PIDs [21-40] | Bitmap |
 | 0x21 | Distance traveled with MIL on | km |
+| 0x23 | Fuel rail pressure | kPa |
+| 0x2C | Commanded EGR | Percentage |
 | 0x2F | Fuel tank level input | Percentage |
+| 0x31 | Distance since codes cleared | km |
 | 0x33 | Barometric pressure | kPa |
+
+**Advanced PIDs (41-60):**
+
+| PID | Description | Data Format |
+|-----|-------------|-------------|
 | 0x40 | Supported PIDs [41-60] | Bitmap |
+| 0x42 | Control module voltage | Battery voltage in mV |
+| 0x45 | Relative throttle position | Percentage |
+| 0x46 | Ambient air temperature | °C + 40 |
+| 0x51 | Fuel type | Gasoline (01) |
+| 0x5C | Engine oil temperature | °C + 40 |
 
 #### Mode 03: Show Stored DTCs
 
