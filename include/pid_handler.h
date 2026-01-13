@@ -289,6 +289,47 @@ public:
             default:
                 break;
         }
+
+        // Calculate common PIDs for all drive modes
+        if (driveMode != DRIVE_OFF) {
+            // MAP (Manifold Absolute Pressure): vacuum at idle, increases with throttle
+            // Idle: ~35 kPa, WOT: ~100 kPa (atmospheric)
+            currentState.map = 35 + (currentState.throttle * 65 / 100);
+
+            // Timing advance: varies with RPM and load
+            // Idle: ~15°, cruise: ~30°, WOT: ~20°
+            if (currentState.throttle > 80) {
+                currentState.timing_advance = 15 + (currentState.rpm / 400);  // Less advance at WOT
+            } else {
+                currentState.timing_advance = 15 + (currentState.rpm / 250);  // More advance during cruise
+            }
+            if (currentState.timing_advance > 35) currentState.timing_advance = 35;
+
+            // Fuel trims: slight variation based on throttle
+            currentState.short_fuel_trim = (int8_t)(sin(elapsedSec) * 3);  // ±3% variation
+            // Long fuel trim stays relatively constant (set in defaults)
+
+            // O2 sensor voltage: cycles around 0.45V (stoichiometric)
+            // 0.45V = 90 units (0.005V per unit)
+            currentState.o2_voltage = 90 + (uint8_t)(sin(elapsedSec * 5) * 20);  // 0.35-0.55V cycling
+
+            // EGR: active during cruise, off at idle and WOT
+            if (currentState.speed > 30 && currentState.throttle > 10 && currentState.throttle < 60) {
+                currentState.egr = 15 + (currentState.throttle / 4);  // 15-30% during cruise
+            } else {
+                currentState.egr = 0;  // Off at idle or WOT
+            }
+
+            // Battery voltage: slight variation during operation
+            currentState.battery_voltage = 14000 + (uint16_t)(sin(elapsedSec * 0.5) * 300);  // 13.7-14.3V
+
+            // Oil temperature: follows coolant but ~5° higher
+            currentState.oil_temp = currentState.coolant_temp + 5;
+            if (currentState.oil_temp > 100) currentState.oil_temp = 100;
+
+            // Fuel pressure stays relatively constant (set in defaults)
+            // Distance tracking would increment here if we tracked actual movement
+        }
     }
 
     // Handle OBD-II mode 01 request
@@ -299,11 +340,11 @@ public:
         switch (pid) {
             case 0x00:  // PIDs supported [01-20]
                 // Bitmap of supported PIDs
-                // We support: 0x01, 0x03, 0x04, 0x05, 0x0C, 0x0D, 0x0F, 0x10, 0x11, 0x1F
-                data[0] = 0b10111000;  // 0x01, 0x03, 0x04, 0x05
-                data[1] = 0b00011011;  // 0x0C, 0x0D, 0x0F, 0x10
-                data[2] = 0b10000000;  // 0x11
-                data[3] = 0b00000011;  // 0x1F, 0x20 (supports next range)
+                // We support: 0x01, 0x03, 0x04, 0x05, 0x06, 0x07, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F, 0x10, 0x11, 0x13, 0x14, 0x1F
+                data[0] = 0b10111100;  // 01-08: 0x01, 0x03, 0x04, 0x05, 0x06, 0x07
+                data[1] = 0b00111111;  // 09-10: 0x0B, 0x0C, 0x0D, 0x0E, 0x0F, 0x10
+                data[2] = 0b10110000;  // 11-18: 0x11, 0x13, 0x14
+                data[3] = 0b00000011;  // 19-20: 0x1F, 0x20 (supports next range)
                 dataLen = 4;
                 break;
 
@@ -338,6 +379,26 @@ public:
                 dataLen = 1;
                 break;
 
+            case 0x06:  // Short term fuel trim - Bank 1
+                // Formula: ((A-128) * 100) / 128 = percent
+                // Range: -100% (lean) to +99.2% (rich)
+                data[0] = ((int16_t)currentState.short_fuel_trim * 128 / 100) + 128;
+                dataLen = 1;
+                break;
+
+            case 0x07:  // Long term fuel trim - Bank 1
+                // Formula: ((A-128) * 100) / 128 = percent
+                // Range: -100% (lean) to +99.2% (rich)
+                data[0] = ((int16_t)currentState.long_fuel_trim * 128 / 100) + 128;
+                dataLen = 1;
+                break;
+
+            case 0x0B:  // Intake manifold absolute pressure
+                // Direct kPa value (0-255)
+                data[0] = currentState.map;
+                dataLen = 1;
+                break;
+
             case 0x0C: {  // Engine RPM
                 // RPM is encoded as (RPM * 4) as 16-bit big-endian
                 // Formula: RPM = ((A * 256) + B) / 4
@@ -350,6 +411,13 @@ public:
 
             case 0x0D:  // Vehicle speed
                 data[0] = currentState.speed;
+                dataLen = 1;
+                break;
+
+            case 0x0E:  // Timing advance
+                // Formula: A/2 - 64 = degrees
+                // Range: -64° to +63.5°
+                data[0] = ((int16_t)currentState.timing_advance + 64) * 2;
                 dataLen = 1;
                 break;
 
@@ -369,6 +437,21 @@ public:
                 dataLen = 1;
                 break;
 
+            case 0x13:  // O2 sensors present
+                // 2 banks × 4 sensors per bank bitmap
+                // We'll indicate bank 1 sensor 1 is present (bit 0)
+                data[0] = 0x01;  // Bank 1 - Sensor 1 present
+                dataLen = 1;
+                break;
+
+            case 0x14:  // O2 Sensor 1 (Bank 1, Sensor 1)
+                // Byte A: O2 sensor voltage (0-1.275V in 0.005V increments)
+                // Byte B: Short term fuel trim (same as PID 0x06)
+                data[0] = currentState.o2_voltage;  // Already scaled (*200)
+                data[1] = ((int16_t)currentState.short_fuel_trim * 128 / 100) + 128;
+                dataLen = 2;
+                break;
+
             case 0x1F:  // Run time since engine start
                 updateRuntime();
                 data[0] = currentState.runtime >> 8;
@@ -377,10 +460,11 @@ public:
                 break;
 
             case 0x20:  // PIDs supported [21-40]
-                data[0] = 0b10000000;  // 0x21 supported
-                data[1] = 0b00000010;  // 0x2F supported
-                data[2] = 0b00100000;  // 0x33 supported
-                data[3] = 0b00000001;  // 0x40 supported
+                // We support: 0x21, 0x23, 0x2C, 0x2F, 0x31, 0x33
+                data[0] = 0b10100000;  // 21-28: 0x21, 0x23
+                data[1] = 0b00001010;  // 29-30: 0x2C, 0x2F
+                data[2] = 0b10100000;  // 31-38: 0x31, 0x33
+                data[3] = 0b00000001;  // 39-40: 0x40 (supports next range)
                 dataLen = 4;
                 break;
 
@@ -390,9 +474,32 @@ public:
                 dataLen = 2;
                 break;
 
+            case 0x23: {  // Fuel rail pressure
+                // Formula: ((A*256)+B) * 0.079 = kPa
+                // We store in kPa, need to encode as value * 0.079 = stored
+                // So stored value = kPa / 0.079 ≈ kPa * 12.7
+                uint16_t encoded = currentState.fuel_pressure * 10 / 79;  // Approximate conversion
+                data[0] = encoded >> 8;
+                data[1] = encoded & 0xFF;
+                dataLen = 2;
+                break;
+            }
+
+            case 0x2C:  // Commanded EGR
+                // 0-100% encoded as 0-255
+                data[0] = (currentState.egr * 255) / 100;
+                dataLen = 1;
+                break;
+
             case 0x2F:  // Fuel tank level input
                 data[0] = (currentState.fuel_level * 255) / 100;
                 dataLen = 1;
+                break;
+
+            case 0x31:  // Distance traveled since codes cleared
+                data[0] = currentState.distance_mil_clear >> 8;
+                data[1] = currentState.distance_mil_clear & 0xFF;
+                dataLen = 2;
                 break;
 
             case 0x33:  // Barometric pressure
@@ -401,12 +508,43 @@ public:
                 break;
 
             case 0x40:  // PIDs supported [41-60]
-                // No additional PIDs supported
-                data[0] = 0x00;
-                data[1] = 0x00;
-                data[2] = 0x00;
-                data[3] = 0x00;
+                // We support: 0x42, 0x45, 0x46, 0x51, 0x5C
+                data[0] = 0b01011000;  // 41-48: 0x42, 0x45, 0x46
+                data[1] = 0b10000000;  // 49-50: 0x51
+                data[2] = 0b00010000;  // 51-58: 0x5C
+                data[3] = 0b00000000;  // 59-60: none (no further ranges)
                 dataLen = 4;
+                break;
+
+            case 0x42: {  // Control module voltage
+                // Formula: ((A*256)+B)/1000 = Volts
+                // We store in millivolts, encode as-is
+                data[0] = currentState.battery_voltage >> 8;
+                data[1] = currentState.battery_voltage & 0xFF;
+                dataLen = 2;
+                break;
+            }
+
+            case 0x45:  // Relative throttle position
+                // Same as absolute throttle for simplicity
+                data[0] = (currentState.throttle * 255) / 100;
+                dataLen = 1;
+                break;
+
+            case 0x46:  // Ambient air temperature
+                data[0] = currentState.ambient_temp + 40;  // °C + 40
+                dataLen = 1;
+                break;
+
+            case 0x51:  // Fuel Type
+                // 01 = Gasoline, 02 = Methanol, 03 = Ethanol, 04 = Diesel, etc.
+                data[0] = 0x01;  // Gasoline
+                dataLen = 1;
+                break;
+
+            case 0x5C:  // Engine oil temperature
+                data[0] = currentState.oil_temp + 40;  // °C + 40
+                dataLen = 1;
                 break;
 
             default:
