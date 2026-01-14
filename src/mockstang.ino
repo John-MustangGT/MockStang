@@ -57,6 +57,9 @@ void setup() {
 
     Serial.println("\n\n=================================");
     Serial.printf("MockStang - OBD-II Emulator (%s)\n", PLATFORM_NAME);
+    #ifdef GIT_COMMIT_HASH
+        Serial.printf("Build: %s @ %s\n", GIT_COMMIT_HASH, BUILD_TIMESTAMP);
+    #endif
     Serial.println("=================================\n");
 
     // Load configuration from EEPROM
