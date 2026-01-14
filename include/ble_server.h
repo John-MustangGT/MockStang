@@ -418,13 +418,31 @@ public:
 
         // Real Vgate adapter sends echo and response as SEPARATE notifications!
         // Parse the response to split echo from actual response
+        #if ENABLE_SERIAL_LOGGING
+            Serial.printf("BLE: Echo enabled: %s\n", elm327->isEchoEnabled() ? "YES" : "NO");
+        #endif
+
         if (deviceConnected && elm327->isEchoEnabled()) {
             // Echo is enabled - need to split into two notifications
             // Format: "CMD\rRESPONSE\r\r>"
             int firstCR = fullResponse.indexOf('\r');
+
+            #if ENABLE_SERIAL_LOGGING
+                Serial.printf("BLE: First CR position: %d\n", firstCR);
+            #endif
+
             if (firstCR > 0) {
                 String echo = fullResponse.substring(0, firstCR + 1);  // "CMD\r"
                 String response = fullResponse.substring(firstCR + 1);  // "\rRESPONSE\r\r>"
+
+                #if ENABLE_SERIAL_LOGGING
+                    Serial.printf("BLE: Sending ECHO (%d bytes): ", echo.length());
+                    for (char c : echo) {
+                        if (c >= 32 && c < 127) Serial.print(c);
+                        else Serial.printf("[0x%02X]", (uint8_t)c);
+                    }
+                    Serial.println();
+                #endif
 
                 // Send echo first
                 sendBLEResponse(echo);
@@ -432,14 +450,27 @@ public:
                 // Brief delay between echo and response (like real adapter)
                 delay(10);
 
+                #if ENABLE_SERIAL_LOGGING
+                    Serial.printf("BLE: Sending RESPONSE (%d bytes): ", response.length());
+                    for (char c : response) {
+                        if (c >= 32 && c < 127) Serial.print(c);
+                        else Serial.printf("[0x%02X]", (uint8_t)c);
+                    }
+                    Serial.println();
+                #endif
+
                 // Send actual response
                 sendBLEResponse(response);
             } else {
-                // No CR found, send as-is
+                #if ENABLE_SERIAL_LOGGING
+                    Serial.println("BLE: No CR found, sending as single");
+                #endif
                 sendBLEResponse(fullResponse);
             }
         } else {
-            // Echo disabled - send as one notification
+            #if ENABLE_SERIAL_LOGGING
+                Serial.println("BLE: Echo disabled, sending as single");
+            #endif
             sendBLEResponse(fullResponse);
         }
 
