@@ -278,7 +278,13 @@ public:
                 Serial.printf("BLE: Custom Service Read - UUID: %s\n", pCharacteristic->getUUID().toString().c_str());
             }
             void onWrite(NimBLECharacteristic* pCharacteristic) {
-                Serial.printf("BLE: Custom Service Write - UUID: %s\n", pCharacteristic->getUUID().toString().c_str());
+                std::string value = pCharacteristic->getValue();
+                Serial.printf("BLE: Custom Service Write - UUID: %s, Data (%d bytes): ",
+                             pCharacteristic->getUUID().toString().c_str(), value.length());
+                for (uint8_t b : value) {
+                    Serial.printf("0x%02X ", b);
+                }
+                Serial.println();
             }
         };
 
@@ -387,7 +393,12 @@ public:
             pOBDCharacteristic->notify();
 
             #if ENABLE_SERIAL_LOGGING
-                Serial.printf("BLE RESP: %s\n", response.c_str());
+                Serial.printf("BLE RESP (%d bytes): ", response.length());
+                for (char c : response) {
+                    if (c >= 32 && c < 127) Serial.print(c);
+                    else Serial.printf("[0x%02X]", (uint8_t)c);
+                }
+                Serial.println();
             #endif
         }
     }
