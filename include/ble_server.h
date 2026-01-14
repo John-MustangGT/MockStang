@@ -53,8 +53,7 @@ private:
             Serial.printf("  MTU: %d\n", pServer->getPeerMTU(desc->conn_handle));
 
             // Update connection parameters for lower latency
-            int rc = pServer->updateConnParams(desc->conn_handle, 24, 48, 0, 60);
-            Serial.printf("  Connection params update: %s\n", rc == 0 ? "OK" : "FAILED");
+            pServer->updateConnParams(desc->conn_handle, 24, 48, 0, 60);
 
             Serial.println("BLE: Waiting for client to subscribe to notifications...");
         }
