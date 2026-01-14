@@ -312,14 +312,6 @@ public:
         // Set initial greeting value so it can be read immediately
         pOBDCharacteristic->setValue("ELM327 v1.5\r\r>");
 
-        // Explicitly create CCCD descriptor for notifications (should be automatic, but be explicit)
-        // This is required for clients to enable/disable notifications
-        NimBLE2902* pCCCD = (NimBLE2902*)pOBDCharacteristic->getDescriptorByUUID((uint16_t)0x2902);
-        if (!pCCCD) {
-            pOBDCharacteristic->createDescriptor((uint16_t)0x2902);
-            Serial.println("BLE: Explicitly created CCCD descriptor");
-        }
-
         pOBDService->start();
 
         // ========================================
