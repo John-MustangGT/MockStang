@@ -28,7 +28,7 @@ public:
     }
 
     void reset() {
-        echo = true;
+        echo = false;  // BLE adapters typically default to echo OFF
         headers = false;
         spaces = true;
         linefeed = true;

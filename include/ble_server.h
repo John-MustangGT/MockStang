@@ -97,17 +97,12 @@ private:
         }
 
         void onSubscribe(NimBLECharacteristic* pCharacteristic, ble_gap_conn_desc* desc, uint16_t subValue) {
-            // Client has subscribed to notifications - send ELM327 greeting
+            // Client has subscribed/unsubscribed to notifications
             if (subValue > 0) {
-                Serial.println("BLE: Client subscribed to notifications");
-                delay(100);  // Brief delay for stability
-
-                String greeting = "ELM327 v1.5\r\r>";
-                pCharacteristic->setValue(greeting.c_str());
-                pCharacteristic->notify();
-                Serial.println("BLE: Sent ELM327 greeting");
+                Serial.println("BLE: Client subscribed to OBD notifications");
+                // Don't send unsolicited greeting - wait for ATZ command
             } else {
-                Serial.println("BLE: Client unsubscribed from notifications");
+                Serial.println("BLE: Client unsubscribed from OBD notifications");
             }
         }
 
