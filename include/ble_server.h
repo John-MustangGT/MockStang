@@ -295,15 +295,19 @@ public:
         pOBDService->start();
 
         // ========================================
-        // Start Advertising - Advertise key services for OBD app recognition
+        // Start Advertising - Advertise ALL services (required for OBD Doctor)
         // ========================================
         NimBLEAdvertising* pAdvertising = NimBLEDevice::getAdvertising();
 
-        // Advertise the main OBD service UUID (required for OBD apps to recognize us)
-        pAdvertising->addServiceUUID(BLE_SERVICE_UUID);
-
-        // Also advertise Device Information Service - helps apps identify device type
-        pAdvertising->addServiceUUID(NimBLEUUID((uint16_t)0x180A));
+        // Advertise all services - OBD Doctor requires this to recognize device
+        pAdvertising->addServiceUUID(NimBLEUUID((uint16_t)0x180F)); // Battery
+        pAdvertising->addServiceUUID(NimBLEUUID((uint16_t)0x1803)); // Link Loss
+        pAdvertising->addServiceUUID(NimBLEUUID((uint16_t)0x1802)); // Immediate Alert
+        pAdvertising->addServiceUUID(NimBLEUUID((uint16_t)0x1811)); // Alert Notification
+        pAdvertising->addServiceUUID(NimBLEUUID((uint16_t)0x1804)); // Tx Power
+        pAdvertising->addServiceUUID(NimBLEUUID((uint16_t)0x18F0)); // Custom service
+        pAdvertising->addServiceUUID(NimBLEUUID((uint16_t)0x180A)); // Device Info
+        pAdvertising->addServiceUUID(BLE_SERVICE_UUID); // OBD Service
 
         pAdvertising->setName(BLE_DEVICE_NAME);
         pAdvertising->setScanResponse(true);
