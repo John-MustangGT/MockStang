@@ -90,8 +90,9 @@ private:
 
         void onRead(NimBLECharacteristic* pCharacteristic) {
             // Some apps may read the characteristic to get the greeting
-            Serial.print("BLE: Client read characteristic, value: ");
-            Serial.println(pCharacteristic->getValue().c_str());
+            Serial.println("BLE: Client read OBD characteristic");
+            Serial.printf("  UUID: %s\n", pCharacteristic->getUUID().toString().c_str());
+            Serial.printf("  Current value: %s\n", pCharacteristic->getValue().c_str());
         }
 
         void onSubscribe(NimBLECharacteristic* pCharacteristic, ble_gap_conn_desc* desc, uint16_t subValue) {
@@ -294,14 +295,15 @@ public:
         pOBDService->start();
 
         // ========================================
-        // Start Advertising - Advertise main OBD service
+        // Start Advertising - Advertise key services for OBD app recognition
         // ========================================
         NimBLEAdvertising* pAdvertising = NimBLEDevice::getAdvertising();
 
-        // Only advertise the main OBD service UUID
-        // Client will discover other services through service discovery
-        // This avoids advertising packet size issues
-        pAdvertising->addServiceUUID(BLE_SERVICE_UUID); // OBD Service
+        // Advertise the main OBD service UUID (required for OBD apps to recognize us)
+        pAdvertising->addServiceUUID(BLE_SERVICE_UUID);
+
+        // Also advertise Device Information Service - helps apps identify device type
+        pAdvertising->addServiceUUID(NimBLEUUID((uint16_t)0x180A));
 
         pAdvertising->setName(BLE_DEVICE_NAME);
         pAdvertising->setScanResponse(true);
