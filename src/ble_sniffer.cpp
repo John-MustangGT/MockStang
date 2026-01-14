@@ -119,17 +119,19 @@ void hexDump(const char* label, const uint8_t* data, size_t len) {
     Serial.println();
 }
 
-// Notification callback for OBD characteristic
+// Notification/Indication callback for OBD characteristic
 static void notifyCallback(NimBLERemoteCharacteristic* pChar, uint8_t* pData, size_t length, bool isNotify) {
-    Serial.println("\n>>> NOTIFICATION RECEIVED <<<");
+    Serial.println(isNotify ? "\n>>> NOTIFICATION RECEIVED <<<" : "\n>>> INDICATION RECEIVED <<<");
     Serial.printf("Characteristic: %s\n", pChar->getUUID().toString().c_str());
+    Serial.printf("Type: %s\n", isNotify ? "NOTIFICATION" : "INDICATION");
     hexDump("Data", pData, length);
 }
 
-// Notification callback for Custom Service 0x2AF0
+// Notification/Indication callback for Custom Service 0x2AF0
 static void customNotifyCallback(NimBLERemoteCharacteristic* pChar, uint8_t* pData, size_t length, bool isNotify) {
-    Serial.println("\n>>> CUSTOM SERVICE NOTIFICATION <<<");
+    Serial.println(isNotify ? "\n>>> CUSTOM SERVICE NOTIFICATION <<<" : "\n>>> CUSTOM SERVICE INDICATION <<<");
     Serial.printf("Characteristic: %s\n", pChar->getUUID().toString().c_str());
+    Serial.printf("Type: %s\n", isNotify ? "NOTIFICATION" : "INDICATION");
     hexDump("Data", pData, length);
 }
 
@@ -239,24 +241,44 @@ bool connectToServer() {
         }
     }
 
-    // Subscribe to notifications on both characteristics
-    Serial.println("\n=== SUBSCRIBING TO NOTIFICATIONS ===");
+    // Subscribe to BOTH notifications AND indications on both characteristics
+    Serial.println("\n=== SUBSCRIBING TO NOTIFICATIONS AND INDICATIONS ===");
 
-    if (pOBDCharacteristic && pOBDCharacteristic->canNotify()) {
-        Serial.println("Subscribing to OBD characteristic...");
-        if (pOBDCharacteristic->subscribe(true, notifyCallback)) {
-            Serial.println("  ✓ Subscribed to OBD notifications");
-        } else {
-            Serial.println("  ✗ Failed to subscribe to OBD");
+    if (pOBDCharacteristic) {
+        if (pOBDCharacteristic->canNotify()) {
+            Serial.println("Subscribing to OBD notifications...");
+            if (pOBDCharacteristic->subscribe(true, notifyCallback)) {
+                Serial.println("  ✓ Subscribed to OBD notifications");
+            } else {
+                Serial.println("  ✗ Failed to subscribe to OBD notifications");
+            }
+        }
+        if (pOBDCharacteristic->canIndicate()) {
+            Serial.println("Subscribing to OBD indications...");
+            if (pOBDCharacteristic->subscribe(true, notifyCallback, true)) {
+                Serial.println("  ✓ Subscribed to OBD indications");
+            } else {
+                Serial.println("  ✗ Failed to subscribe to OBD indications");
+            }
         }
     }
 
-    if (pCustomNotifyChar && pCustomNotifyChar->canNotify()) {
-        Serial.println("Subscribing to Custom Service 0x2AF0...");
-        if (pCustomNotifyChar->subscribe(true, customNotifyCallback)) {
-            Serial.println("  ✓ Subscribed to Custom Service notifications");
-        } else {
-            Serial.println("  ✗ Failed to subscribe to Custom Service");
+    if (pCustomNotifyChar) {
+        if (pCustomNotifyChar->canNotify()) {
+            Serial.println("Subscribing to Custom Service 0x2AF0 notifications...");
+            if (pCustomNotifyChar->subscribe(true, customNotifyCallback)) {
+                Serial.println("  ✓ Subscribed to Custom Service notifications");
+            } else {
+                Serial.println("  ✗ Failed to subscribe to Custom Service notifications");
+            }
+        }
+        if (pCustomNotifyChar->canIndicate()) {
+            Serial.println("Subscribing to Custom Service 0x2AF0 indications...");
+            if (pCustomNotifyChar->subscribe(true, customNotifyCallback, true)) {
+                Serial.println("  ✓ Subscribed to Custom Service indications");
+            } else {
+                Serial.println("  ✗ Failed to subscribe to Custom Service indications");
+            }
         }
     }
 
