@@ -52,8 +52,8 @@ private:
             Serial.printf("  Connection handle: %d\n", desc->conn_handle);
             Serial.printf("  MTU: %d\n", pServer->getPeerMTU(desc->conn_handle));
 
-            // Update connection parameters for lower latency
-            pServer->updateConnParams(desc->conn_handle, 24, 48, 0, 60);
+            // Let client negotiate connection parameters
+            // Don't force parameters immediately - can cause disconnects
         }
 
         void onMTUChange(uint16_t MTU, ble_gap_conn_desc* desc) {
@@ -61,12 +61,13 @@ private:
             Serial.println("BLE: Waiting for client to subscribe to notifications...");
         }
 
-        void onDisconnect(NimBLEServer* pServer) {
+        void onDisconnect(NimBLEServer* pServer, ble_gap_conn_desc* desc) {
             parent->deviceConnected = false;
             if (parent->connectedClients > 0) {
                 parent->connectedClients--;
             }
             Serial.printf("BLE Client disconnected (remaining: %d)\n", parent->connectedClients);
+            Serial.printf("  Disconnect reason: %d\n", desc->reason);
 
             // Clear input buffer on disconnect
             parent->inputBuffer = "";
@@ -294,18 +295,13 @@ public:
         pOBDService->start();
 
         // ========================================
-        // Start Advertising - Advertise ALL services like real device
+        // Start Advertising - Advertise main OBD service
         // ========================================
         NimBLEAdvertising* pAdvertising = NimBLEDevice::getAdvertising();
 
-        // Advertise all services (match real Vgate device)
-        pAdvertising->addServiceUUID(NimBLEUUID((uint16_t)0x180F)); // Battery
-        pAdvertising->addServiceUUID(NimBLEUUID((uint16_t)0x1803)); // Link Loss
-        pAdvertising->addServiceUUID(NimBLEUUID((uint16_t)0x1802)); // Immediate Alert
-        pAdvertising->addServiceUUID(NimBLEUUID((uint16_t)0x1811)); // Alert Notification
-        pAdvertising->addServiceUUID(NimBLEUUID((uint16_t)0x1804)); // Tx Power
-        pAdvertising->addServiceUUID(NimBLEUUID((uint16_t)0x18F0)); // Custom service
-        pAdvertising->addServiceUUID(NimBLEUUID((uint16_t)0x180A)); // Device Info
+        // Only advertise the main OBD service UUID
+        // Client will discover other services through service discovery
+        // This avoids advertising packet size issues
         pAdvertising->addServiceUUID(BLE_SERVICE_UUID); // OBD Service
 
         pAdvertising->setName(BLE_DEVICE_NAME);
