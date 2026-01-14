@@ -315,10 +315,27 @@ public:
         );
         pCustomWrite->setCallbacks(new CustomCallbacks(this));
 
-        // Characteristic 2AF0 [Notify] - Responses go here for some OBD apps
+        // Callbacks for Custom Notify characteristic to track subscription/reads
+        class CustomNotifyCallbacks: public NimBLECharacteristicCallbacks {
+            void onRead(NimBLECharacteristic* pCharacteristic) {
+                Serial.println("BLE: Custom Service 0x2AF0 - Client READ response");
+            }
+            void onSubscribe(NimBLECharacteristic* pCharacteristic, ble_gap_conn_desc* desc, uint16_t subValue) {
+                if (subValue > 0) {
+                    Serial.println("BLE: Custom Service 0x2AF0 - Client SUBSCRIBED to notifications");
+                } else {
+                    Serial.println("BLE: Custom Service 0x2AF0 - Client UNSUBSCRIBED from notifications");
+                }
+            }
+        };
+
+        // Characteristic 2AF0 [Read, Notify] - Responses go here for some OBD apps
+        // Adding READ so apps can poll for responses instead of using notifications
         pCustomNotifyCharacteristic = pCustomService->createCharacteristic(
-            NimBLEUUID((uint16_t)0x2AF0), NIMBLE_PROPERTY::NOTIFY
+            NimBLEUUID((uint16_t)0x2AF0),
+            NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::NOTIFY
         );
+        pCustomNotifyCharacteristic->setCallbacks(new CustomNotifyCallbacks());
 
         pCustomService->start();
 
