@@ -416,20 +416,23 @@ public:
             response = pidHandler->handleRequest(command);
         }
 
-        // Send response via BLE notification on BOTH characteristics
+        // Send response via BLE notification AND indication on BOTH characteristics
         // Some apps use OBD service, some use Custom service
+        // Some apps listen for notifications, some for indications
         if (deviceConnected) {
-            // Send to main OBD characteristic
+            // Send to main OBD characteristic (supports both Notify and Indicate)
             if (pOBDCharacteristic) {
                 pOBDCharacteristic->setValue(response.c_str());
-                pOBDCharacteristic->notify();
+                pOBDCharacteristic->notify();    // Fire-and-forget
+                pOBDCharacteristic->indicate();  // Requires acknowledgment
             }
 
             // Also send to Custom Service notify characteristic (0x2AF0)
-            // CarScanner and similar apps listen here
+            // Real Vgate has both Notify and Indicate on this characteristic
             if (pCustomNotifyCharacteristic) {
                 pCustomNotifyCharacteristic->setValue(response.c_str());
-                pCustomNotifyCharacteristic->notify();
+                pCustomNotifyCharacteristic->notify();    // Fire-and-forget
+                pCustomNotifyCharacteristic->indicate();  // Requires acknowledgment
             }
 
             #if ENABLE_SERIAL_LOGGING
