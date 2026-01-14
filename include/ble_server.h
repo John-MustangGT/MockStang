@@ -75,10 +75,9 @@ private:
         CharacteristicCallbacks(BLEOBDServer* p) : parent(p) {}
 
         void onRead(NimBLECharacteristic* pCharacteristic) {
-            // Some apps may read the characteristic
-            #if ENABLE_SERIAL_LOGGING
-                Serial.println("BLE characteristic read");
-            #endif
+            // Some apps may read the characteristic to get the greeting
+            Serial.print("BLE: Client read characteristic, value: ");
+            Serial.println(pCharacteristic->getValue().c_str());
         }
 
         void onSubscribe(NimBLECharacteristic* pCharacteristic, ble_gap_conn_desc* desc, uint16_t subValue) {
@@ -274,6 +273,9 @@ public:
             NIMBLE_PROPERTY::NOTIFY
         );
         pOBDCharacteristic->setCallbacks(new CharacteristicCallbacks(this));
+
+        // Set initial greeting value so it can be read immediately
+        pOBDCharacteristic->setValue("ELM327 v1.5\r\r>");
 
         pOBDService->start();
 
