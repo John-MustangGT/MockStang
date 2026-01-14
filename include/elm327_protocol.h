@@ -59,15 +59,15 @@ public:
             return response + "ELM327 v1.5\r\r>";
         }
         else if (cmd == "ATI" || cmd == "AT I") {
-            // Device info
-            return response + ELM_DEVICE_DESC "\r\r>";
-        }
-        else if (cmd == "AT@1") {
-            // Device description
+            // Device info - returns device identifier
             return response + ELM_DEVICE_ID "\r\r>";
         }
+        else if (cmd == "AT@1") {
+            // Device description - returns version string
+            return response + ELM_DEVICE_DESC "\r\r>";
+        }
         else if (cmd == "AT@2") {
-            // Device identifier (often same as @1)
+            // Device identifier (same as ATI)
             return response + ELM_DEVICE_ID "\r\r>";
         }
         else if (cmd == "ATRV") {
