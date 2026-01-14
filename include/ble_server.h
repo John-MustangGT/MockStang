@@ -433,7 +433,7 @@ public:
 
             if (firstCR > 0) {
                 String echo = fullResponse.substring(0, firstCR + 1);  // "CMD\r"
-                String response = fullResponse.substring(firstCR + 1);  // "\rRESPONSE\r\r>"
+                String response = fullResponse.substring(firstCR);  // "\rRESPONSE\r\r>"
 
                 #if ENABLE_SERIAL_LOGGING
                     Serial.printf("BLE: Sending ECHO (%d bytes): ", echo.length());
