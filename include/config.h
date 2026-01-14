@@ -21,13 +21,8 @@
 
 // ELM327 Protocol Settings
 #define ELM_DEVICE_DESC "ELM327 v1.5"
-#ifdef ESP01_BUILD
-    #define ELM_DEVICE_ID "MockStang ESP-01S"
-#elif defined(ESP32_BUILD)
-    #define ELM_DEVICE_ID "MockStang ESP32-S3"
-#else
-    #define ELM_DEVICE_ID "MockStang"
-#endif
+// Use Vgate-compatible device ID for OBD app recognition
+#define ELM_DEVICE_ID "OBDII to RS232 Interpreter"
 #define ELM_VOLTAGE "12.8V"  // Simulated car voltage
 
 // Serial Debugging
