@@ -61,13 +61,12 @@ private:
             Serial.println("BLE: Waiting for client to subscribe to notifications...");
         }
 
-        void onDisconnect(NimBLEServer* pServer, ble_gap_conn_desc* desc) {
+        void onDisconnect(NimBLEServer* pServer) {
             parent->deviceConnected = false;
             if (parent->connectedClients > 0) {
                 parent->connectedClients--;
             }
             Serial.printf("BLE Client disconnected (remaining: %d)\n", parent->connectedClients);
-            Serial.printf("  Disconnect reason: %d\n", desc->reason);
 
             // Clear input buffer on disconnect
             parent->inputBuffer = "";
