@@ -37,6 +37,8 @@ private:
 
     bool deviceConnected;
     bool oldDeviceConnected;
+    bool obdCharSubscribed;      // Track if client subscribed to main OBD characteristic
+    bool customCharSubscribed;   // Track if client subscribed to Custom 0x2AF0
     String inputBuffer;
     uint8_t connectedClients;
 
@@ -69,8 +71,10 @@ private:
             }
             Serial.printf("BLE Client disconnected (remaining: %d)\n", parent->connectedClients);
 
-            // Clear input buffer on disconnect
+            // Clear input buffer and subscription flags on disconnect
             parent->inputBuffer = "";
+            parent->obdCharSubscribed = false;
+            parent->customCharSubscribed = false;
         }
 
         uint32_t onPassKeyRequest() {
@@ -99,9 +103,11 @@ private:
         void onSubscribe(NimBLECharacteristic* pCharacteristic, ble_gap_conn_desc* desc, uint16_t subValue) {
             // Client has subscribed/unsubscribed to notifications
             if (subValue > 0) {
+                parent->obdCharSubscribed = true;
                 Serial.println("BLE: Client subscribed to OBD notifications");
                 // Don't send unsolicited greeting - wait for ATZ command
             } else {
+                parent->obdCharSubscribed = false;
                 Serial.println("BLE: Client unsubscribed from OBD notifications");
             }
         }
@@ -142,6 +148,7 @@ public:
     BLEOBDServer(PIDHandler* handler, ConfigManager* config, ELM327Protocol* elm)
         : pidHandler(handler), configManager(config), elm327(elm),
           deviceConnected(false), oldDeviceConnected(false), connectedClients(0),
+          obdCharSubscribed(false), customCharSubscribed(false),
           pOBDCharacteristic(nullptr), pCustomNotifyCharacteristic(nullptr) {}
 
     void begin() {
@@ -314,13 +321,19 @@ public:
 
         // Callbacks for Custom Notify characteristic to track subscription/reads
         class CustomNotifyCallbacks: public NimBLECharacteristicCallbacks {
+            BLEOBDServer* parent;
+        public:
+            CustomNotifyCallbacks(BLEOBDServer* p) : parent(p) {}
+
             void onRead(NimBLECharacteristic* pCharacteristic) {
                 Serial.println("BLE: Custom Service 0x2AF0 - Client READ response");
             }
             void onSubscribe(NimBLECharacteristic* pCharacteristic, ble_gap_conn_desc* desc, uint16_t subValue) {
                 if (subValue > 0) {
+                    parent->customCharSubscribed = true;
                     Serial.println("BLE: Custom Service 0x2AF0 - Client SUBSCRIBED to notifications");
                 } else {
+                    parent->customCharSubscribed = false;
                     Serial.println("BLE: Custom Service 0x2AF0 - Client UNSUBSCRIBED from notifications");
                 }
             }
@@ -332,7 +345,7 @@ public:
             NimBLEUUID((uint16_t)0x2AF0),
             NIMBLE_PROPERTY::NOTIFY | NIMBLE_PROPERTY::INDICATE
         );
-        pCustomNotifyCharacteristic->setCallbacks(new CustomNotifyCallbacks());
+        pCustomNotifyCharacteristic->setCallbacks(new CustomNotifyCallbacks(this));
 
         pCustomService->start();
 
@@ -487,12 +500,27 @@ public:
     void sendBLEResponse(const String& response) {
         if (!deviceConnected) return;
 
-        // Real Vgate adapter sends responses ONLY via main OBD characteristic's notify()
-        // (NOT indicate, NOT via custom service 0x2AF0)
-        // Sniffer showed 100% of responses via notification, zero via indication
-        if (pOBDCharacteristic) {
+        // Send responses to whichever characteristic(s) the client subscribed to
+        // Real Vgate sends via notify() only (NOT indicate)
+
+        // Send to main OBD characteristic if subscribed
+        if (obdCharSubscribed && pOBDCharacteristic) {
             pOBDCharacteristic->setValue(response.c_str());
-            pOBDCharacteristic->notify();  // Send notification only
+            pOBDCharacteristic->notify();
+
+            #if ENABLE_SERIAL_LOGGING
+                Serial.println("  -> Sent via main OBD characteristic");
+            #endif
+        }
+
+        // Send to Custom 0x2AF0 if subscribed
+        if (customCharSubscribed && pCustomNotifyCharacteristic) {
+            pCustomNotifyCharacteristic->setValue(response.c_str());
+            pCustomNotifyCharacteristic->notify();
+
+            #if ENABLE_SERIAL_LOGGING
+                Serial.println("  -> Sent via Custom 0x2AF0 characteristic");
+            #endif
         }
     }
 
