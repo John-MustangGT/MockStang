@@ -120,21 +120,136 @@ public:
     void begin() {
         Serial.println("Initializing BLE (Vgate/Vlinker Profile)...");
 
-        // Initialize NimBLE with minimal configuration
+        // Initialize NimBLE
         NimBLEDevice::init(BLE_DEVICE_NAME);
-        NimBLEDevice::setPower(ESP_PWR_LVL_P9); // Max power for better range
-        NimBLEDevice::setMTU(512);  // Larger MTU for better throughput
+        NimBLEDevice::setPower(ESP_PWR_LVL_P9);
+        NimBLEDevice::setMTU(512);
 
         // Create BLE Server
         pServer = NimBLEDevice::createServer();
         pServer->setCallbacks(new ServerCallbacks(this));
 
         // ========================================
-        // OBD-II Service (Vgate/Vlinker Profile)
+        // Battery Service (180F) - Real Vgate has this
+        // ========================================
+        NimBLEService* pBatteryService = pServer->createService(NimBLEUUID((uint16_t)0x180F));
+        NimBLECharacteristic* pBatteryLevel = pBatteryService->createCharacteristic(
+            NimBLEUUID((uint16_t)0x2A19),
+            NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::NOTIFY
+        );
+        uint8_t batteryLevel = 100;
+        pBatteryLevel->setValue(&batteryLevel, 1);
+        pBatteryService->start();
+
+        // ========================================
+        // Link Loss Service (1803) - Real Vgate has this
+        // ========================================
+        NimBLEService* pLinkLossService = pServer->createService(NimBLEUUID((uint16_t)0x1803));
+        NimBLECharacteristic* pLinkLossAlert = pLinkLossService->createCharacteristic(
+            NimBLEUUID((uint16_t)0x2A06),
+            NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::WRITE
+        );
+        uint8_t alertLevel = 0;
+        pLinkLossAlert->setValue(&alertLevel, 1);
+        pLinkLossService->start();
+
+        // ========================================
+        // Immediate Alert Service (1802) - Real Vgate has this
+        // ========================================
+        NimBLEService* pImmediateAlertService = pServer->createService(NimBLEUUID((uint16_t)0x1802));
+        NimBLECharacteristic* pImmediateAlert = pImmediateAlertService->createCharacteristic(
+            NimBLEUUID((uint16_t)0x2A06),
+            NIMBLE_PROPERTY::WRITE_NR
+        );
+        pImmediateAlertService->start();
+
+        // ========================================
+        // Alert Notification Service (1811) - Real Vgate has this
+        // ========================================
+        NimBLEService* pAlertNotifyService = pServer->createService(NimBLEUUID((uint16_t)0x1811));
+
+        // Supported New Alert Category (2A47) [Read]
+        NimBLECharacteristic* pSupportedNew = pAlertNotifyService->createCharacteristic(
+            NimBLEUUID((uint16_t)0x2A47), NIMBLE_PROPERTY::READ
+        );
+
+        // New Alert (2A46) [Notify]
+        NimBLECharacteristic* pNewAlert = pAlertNotifyService->createCharacteristic(
+            NimBLEUUID((uint16_t)0x2A46), NIMBLE_PROPERTY::NOTIFY
+        );
+
+        // Supported Unread Alert Category (2A48) [Read]
+        NimBLECharacteristic* pSupportedUnread = pAlertNotifyService->createCharacteristic(
+            NimBLEUUID((uint16_t)0x2A48), NIMBLE_PROPERTY::READ
+        );
+
+        // Unread Alert Status (2A45) [Notify]
+        NimBLECharacteristic* pUnreadAlert = pAlertNotifyService->createCharacteristic(
+            NimBLEUUID((uint16_t)0x2A45), NIMBLE_PROPERTY::NOTIFY
+        );
+
+        // Alert Notification Control Point (2A44) [Write, Notify]
+        NimBLECharacteristic* pAlertControl = pAlertNotifyService->createCharacteristic(
+            NimBLEUUID((uint16_t)0x2A44),
+            NIMBLE_PROPERTY::WRITE | NIMBLE_PROPERTY::NOTIFY
+        );
+
+        pAlertNotifyService->start();
+
+        // ========================================
+        // Tx Power Service (1804) - Real Vgate has this
+        // ========================================
+        NimBLEService* pTxPowerService = pServer->createService(NimBLEUUID((uint16_t)0x1804));
+        NimBLECharacteristic* pTxPowerLevel = pTxPowerService->createCharacteristic(
+            NimBLEUUID((uint16_t)0x2A07), NIMBLE_PROPERTY::READ
+        );
+        int8_t txPower = 0;
+        pTxPowerLevel->setValue((uint8_t*)&txPower, 1);
+        pTxPowerService->start();
+
+        // ========================================
+        // Device Information Service (180A) - Real Vgate has this
+        // Only 2A23 (System ID) and 2A29 (Manufacturer) like real device
+        // ========================================
+        NimBLEService* pDISService = pServer->createService(NimBLEUUID((uint16_t)0x180A));
+
+        // System ID (2A23) [Read]
+        NimBLECharacteristic* pSystemID = pDISService->createCharacteristic(
+            NimBLEUUID((uint16_t)0x2A23), NIMBLE_PROPERTY::READ
+        );
+        uint8_t systemID[8] = {0x12, 0x34, 0x56, 0x78, 0x9A, 0xBC, 0xDE, 0xF0};
+        pSystemID->setValue(systemID, 8);
+
+        // Manufacturer Name (2A29) [Read]
+        NimBLECharacteristic* pManufacturer = pDISService->createCharacteristic(
+            NimBLEUUID((uint16_t)0x2A29), NIMBLE_PROPERTY::READ
+        );
+        pManufacturer->setValue("Vgate");
+
+        pDISService->start();
+
+        // ========================================
+        // Custom Service 18F0 - Real Vgate has this (unknown purpose)
+        // ========================================
+        NimBLEService* pCustomService = pServer->createService(NimBLEUUID((uint16_t)0x18F0));
+
+        // Characteristic 2AF1 [Write]
+        NimBLECharacteristic* pCustomWrite = pCustomService->createCharacteristic(
+            NimBLEUUID((uint16_t)0x2AF1), NIMBLE_PROPERTY::WRITE
+        );
+
+        // Characteristic 2AF0 [Notify]
+        NimBLECharacteristic* pCustomNotify = pCustomService->createCharacteristic(
+            NimBLEUUID((uint16_t)0x2AF0), NIMBLE_PROPERTY::NOTIFY
+        );
+
+        pCustomService->start();
+
+        // ========================================
+        // OBD-II Service (E7810A71-...) - The main service
         // ========================================
         NimBLEService* pOBDService = pServer->createService(BLE_SERVICE_UUID);
 
-        // Single characteristic for Read, Write, Notify
         pOBDCharacteristic = pOBDService->createCharacteristic(
             BLE_CHAR_UUID,
             NIMBLE_PROPERTY::READ |
@@ -144,37 +259,33 @@ public:
         );
         pOBDCharacteristic->setCallbacks(new CharacteristicCallbacks(this));
 
-        // Start OBD service
         pOBDService->start();
 
         // ========================================
-        // Start Advertising (ONLY the OBD service)
+        // Start Advertising - Advertise ALL services like real device
         // ========================================
         NimBLEAdvertising* pAdvertising = NimBLEDevice::getAdvertising();
 
-        // Clear any default advertising data
-        pAdvertising->reset();
+        // Advertise all services (match real Vgate device)
+        pAdvertising->addServiceUUID(NimBLEUUID((uint16_t)0x180F)); // Battery
+        pAdvertising->addServiceUUID(NimBLEUUID((uint16_t)0x1803)); // Link Loss
+        pAdvertising->addServiceUUID(NimBLEUUID((uint16_t)0x1802)); // Immediate Alert
+        pAdvertising->addServiceUUID(NimBLEUUID((uint16_t)0x1811)); // Alert Notification
+        pAdvertising->addServiceUUID(NimBLEUUID((uint16_t)0x1804)); // Tx Power
+        pAdvertising->addServiceUUID(NimBLEUUID((uint16_t)0x18F0)); // Custom service
+        pAdvertising->addServiceUUID(NimBLEUUID((uint16_t)0x180A)); // Device Info
+        pAdvertising->addServiceUUID(BLE_SERVICE_UUID); // OBD Service
 
-        // Only advertise the OBD service UUID
-        pAdvertising->addServiceUUID(BLE_SERVICE_UUID);
-
-        // Set device name in advertising
         pAdvertising->setName(BLE_DEVICE_NAME);
-
-        // Enable scan response to fit more data
         pAdvertising->setScanResponse(true);
+        pAdvertising->setMinPreferred(0x06);
+        pAdvertising->setMaxPreferred(0x12);
 
-        // Connection interval preferences (for iOS compatibility)
-        pAdvertising->setMinPreferred(0x06);  // 7.5ms
-        pAdvertising->setMaxPreferred(0x12);  // 22.5ms
-
-        // Start advertising
         pAdvertising->start();
 
-        Serial.printf("BLE server started:\n");
+        Serial.println("BLE server started with full Vgate/Vlinker profile:");
         Serial.printf("  Device Name: %s\n", BLE_DEVICE_NAME);
-        Serial.printf("  OBD Service: %s\n", BLE_SERVICE_UUID);
-        Serial.printf("  Characteristic: %s\n", BLE_CHAR_UUID);
+        Serial.printf("  Services: Battery, Link Loss, Alerts, Tx Power, DIS, OBD\n");
         Serial.println("Ready for BLE connections...");
     }
 
