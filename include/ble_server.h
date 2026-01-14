@@ -404,45 +404,71 @@ public:
             Serial.printf("BLE CMD: %s\n", command.c_str());
         #endif
 
-        String response;
-
         // Process command through ELM327 protocol handler
+        // This returns the FULL response including echo (if enabled)
+        String fullResponse;
         if (command.startsWith("AT") || command.startsWith("at")) {
             // AT command
-            response = elm327->handleCommand(command);
+            fullResponse = elm327->handleCommand(command);
         } else {
             // OBD-II request - simulate ECU query delay
             delay(35);
-            response = pidHandler->handleRequest(command);
+            fullResponse = pidHandler->handleRequest(command);
         }
 
-        // Send response via BLE notification AND indication on BOTH characteristics
-        // Some apps use OBD service, some use Custom service
-        // Some apps listen for notifications, some for indications
-        if (deviceConnected) {
-            // Send to main OBD characteristic (supports both Notify and Indicate)
-            if (pOBDCharacteristic) {
-                pOBDCharacteristic->setValue(response.c_str());
-                pOBDCharacteristic->notify();    // Fire-and-forget
-                pOBDCharacteristic->indicate();  // Requires acknowledgment
-            }
+        // Real Vgate adapter sends echo and response as SEPARATE notifications!
+        // Parse the response to split echo from actual response
+        if (deviceConnected && elm327->isEchoEnabled()) {
+            // Echo is enabled - need to split into two notifications
+            // Format: "CMD\rRESPONSE\r\r>"
+            int firstCR = fullResponse.indexOf('\r');
+            if (firstCR > 0) {
+                String echo = fullResponse.substring(0, firstCR + 1);  // "CMD\r"
+                String response = fullResponse.substring(firstCR + 1);  // "\rRESPONSE\r\r>"
 
-            // Also send to Custom Service notify characteristic (0x2AF0)
-            // Real Vgate has both Notify and Indicate on this characteristic
-            if (pCustomNotifyCharacteristic) {
-                pCustomNotifyCharacteristic->setValue(response.c_str());
-                pCustomNotifyCharacteristic->notify();    // Fire-and-forget
-                pCustomNotifyCharacteristic->indicate();  // Requires acknowledgment
-            }
+                // Send echo first
+                sendBLEResponse(echo);
 
-            #if ENABLE_SERIAL_LOGGING
-                Serial.printf("BLE RESP (%d bytes): ", response.length());
-                for (char c : response) {
-                    if (c >= 32 && c < 127) Serial.print(c);
-                    else Serial.printf("[0x%02X]", (uint8_t)c);
-                }
-                Serial.println();
-            #endif
+                // Brief delay between echo and response (like real adapter)
+                delay(10);
+
+                // Send actual response
+                sendBLEResponse(response);
+            } else {
+                // No CR found, send as-is
+                sendBLEResponse(fullResponse);
+            }
+        } else {
+            // Echo disabled - send as one notification
+            sendBLEResponse(fullResponse);
+        }
+
+        #if ENABLE_SERIAL_LOGGING
+            Serial.printf("BLE RESP (%d bytes): ", fullResponse.length());
+            for (char c : fullResponse) {
+                if (c >= 32 && c < 127) Serial.print(c);
+                else Serial.printf("[0x%02X]", (uint8_t)c);
+            }
+            Serial.println();
+        #endif
+    }
+
+    void sendBLEResponse(const String& response) {
+        if (!deviceConnected) return;
+
+        // Send to main OBD characteristic (supports both Notify and Indicate)
+        if (pOBDCharacteristic) {
+            pOBDCharacteristic->setValue(response.c_str());
+            pOBDCharacteristic->notify();    // Fire-and-forget
+            pOBDCharacteristic->indicate();  // Requires acknowledgment
+        }
+
+        // Also send to Custom Service notify characteristic (0x2AF0)
+        // Real Vgate has both Notify and Indicate on this characteristic
+        if (pCustomNotifyCharacteristic) {
+            pCustomNotifyCharacteristic->setValue(response.c_str());
+            pCustomNotifyCharacteristic->notify();    // Fire-and-forget
+            pCustomNotifyCharacteristic->indicate();  // Requires acknowledgment
         }
     }
 

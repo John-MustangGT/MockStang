@@ -36,6 +36,10 @@ public:
         timeout = 200;
     }
 
+    bool isEchoEnabled() const {
+        return echo;
+    }
+
     // Parse AT command and return response
     String handleCommand(String cmd) {
         cmd.trim();
