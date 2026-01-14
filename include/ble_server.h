@@ -243,18 +243,27 @@ public:
         // ========================================
         NimBLEService* pDISService = pServer->createService(NimBLEUUID((uint16_t)0x180A));
 
+        // Callbacks for DIS characteristics to see what OBD Doctor reads
+        class DISCallbacks: public NimBLECharacteristicCallbacks {
+            void onRead(NimBLECharacteristic* pCharacteristic) {
+                Serial.printf("BLE: DIS Read - UUID: %s\n", pCharacteristic->getUUID().toString().c_str());
+            }
+        };
+
         // System ID (2A23) [Read]
         NimBLECharacteristic* pSystemID = pDISService->createCharacteristic(
             NimBLEUUID((uint16_t)0x2A23), NIMBLE_PROPERTY::READ
         );
         uint8_t systemID[8] = {0x12, 0x34, 0x56, 0x78, 0x9A, 0xBC, 0xDE, 0xF0};
         pSystemID->setValue(systemID, 8);
+        pSystemID->setCallbacks(new DISCallbacks());
 
         // Manufacturer Name (2A29) [Read]
         NimBLECharacteristic* pManufacturer = pDISService->createCharacteristic(
             NimBLEUUID((uint16_t)0x2A29), NIMBLE_PROPERTY::READ
         );
         pManufacturer->setValue("Vgate");
+        pManufacturer->setCallbacks(new DISCallbacks());
 
         pDISService->start();
 
