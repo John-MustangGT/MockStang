@@ -99,6 +99,15 @@ private:
         void onWrite(NimBLECharacteristic* pCharacteristic) {
             std::string rxValue = pCharacteristic->getValue();
             if (rxValue.length() > 0) {
+                #if ENABLE_SERIAL_LOGGING
+                    Serial.printf("BLE RX (%d bytes): ", rxValue.length());
+                    for (char c : rxValue) {
+                        if (c >= 32 && c < 127) Serial.print(c);
+                        else Serial.printf("[0x%02X]", (uint8_t)c);
+                    }
+                    Serial.println();
+                #endif
+
                 // Handle incoming data
                 for (char c : rxValue) {
                     // ELM327 uses \r as terminator
@@ -110,6 +119,7 @@ private:
                     } else if (c >= 32 && c < 127) {  // Printable characters
                         parent->inputBuffer += c;
                         if (parent->inputBuffer.length() >= MAX_COMMAND_LENGTH) {
+                            Serial.println("BLE: Buffer overflow - clearing");
                             parent->inputBuffer = "";  // Buffer overflow protection
                         }
                     }
