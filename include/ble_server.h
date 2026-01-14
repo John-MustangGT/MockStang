@@ -304,9 +304,11 @@ public:
             }
         };
 
-        // Characteristic 2AF1 [Write] - Commands come here for some OBD apps
+        // Characteristic 2AF1 [Write, Write_NR] - Commands come here for some OBD apps
+        // Real Vgate has BOTH Write and Write_NR properties
         NimBLECharacteristic* pCustomWrite = pCustomService->createCharacteristic(
-            NimBLEUUID((uint16_t)0x2AF1), NIMBLE_PROPERTY::WRITE
+            NimBLEUUID((uint16_t)0x2AF1),
+            NIMBLE_PROPERTY::WRITE | NIMBLE_PROPERTY::WRITE_NR
         );
         pCustomWrite->setCallbacks(new CustomCallbacks(this));
 
@@ -324,11 +326,11 @@ public:
             }
         };
 
-        // Characteristic 2AF0 [Read, Notify] - Responses go here for some OBD apps
-        // Adding READ so apps can poll for responses instead of using notifications
+        // Characteristic 2AF0 [Notify, Indicate] - Responses go here for some OBD apps
+        // Real Vgate has Notify + Indicate (NO Read property!)
         pCustomNotifyCharacteristic = pCustomService->createCharacteristic(
             NimBLEUUID((uint16_t)0x2AF0),
-            NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::NOTIFY
+            NIMBLE_PROPERTY::NOTIFY | NIMBLE_PROPERTY::INDICATE
         );
         pCustomNotifyCharacteristic->setCallbacks(new CustomNotifyCallbacks());
 
@@ -339,12 +341,13 @@ public:
         // ========================================
         NimBLEService* pOBDService = pServer->createService(BLE_SERVICE_UUID);
 
-        // Match real Vgate exactly: Read, Write, Notify (no Write_NR)
+        // Match real Vgate exactly: Read, Write, Notify, Indicate
         pOBDCharacteristic = pOBDService->createCharacteristic(
             BLE_CHAR_UUID,
             NIMBLE_PROPERTY::READ |
             NIMBLE_PROPERTY::WRITE |
-            NIMBLE_PROPERTY::NOTIFY
+            NIMBLE_PROPERTY::NOTIFY |
+            NIMBLE_PROPERTY::INDICATE
         );
         pOBDCharacteristic->setCallbacks(new CharacteristicCallbacks(this));
 
@@ -354,19 +357,13 @@ public:
         pOBDService->start();
 
         // ========================================
-        // Start Advertising - Advertise ALL services (required for OBD Doctor)
+        // Start Advertising - Match real Vgate adapter exactly
         // ========================================
         NimBLEAdvertising* pAdvertising = NimBLEDevice::getAdvertising();
 
-        // Advertise all services - OBD Doctor requires this to recognize device
-        pAdvertising->addServiceUUID(NimBLEUUID((uint16_t)0x180F)); // Battery
-        pAdvertising->addServiceUUID(NimBLEUUID((uint16_t)0x1803)); // Link Loss
-        pAdvertising->addServiceUUID(NimBLEUUID((uint16_t)0x1802)); // Immediate Alert
-        pAdvertising->addServiceUUID(NimBLEUUID((uint16_t)0x1811)); // Alert Notification
-        pAdvertising->addServiceUUID(NimBLEUUID((uint16_t)0x1804)); // Tx Power
+        // Real Vgate advertises ONLY 0x18F0 custom service
+        // All other services are discovered after connection
         pAdvertising->addServiceUUID(NimBLEUUID((uint16_t)0x18F0)); // Custom service
-        pAdvertising->addServiceUUID(NimBLEUUID((uint16_t)0x180A)); // Device Info
-        pAdvertising->addServiceUUID(BLE_SERVICE_UUID); // OBD Service
 
         pAdvertising->setName(BLE_DEVICE_NAME);
         pAdvertising->setScanResponse(true);
