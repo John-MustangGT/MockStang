@@ -60,6 +60,16 @@ private:
 
         void onMTUChange(uint16_t MTU, ble_gap_conn_desc* desc) {
             Serial.printf("BLE: MTU changed to %d\n", MTU);
+
+            // Try sending greeting proactively after MTU negotiation
+            // Some OBD apps expect immediate response
+            delay(200);
+            if (parent->pOBDCharacteristic) {
+                String greeting = "ELM327 v1.5\r\r>";
+                parent->pOBDCharacteristic->setValue(greeting.c_str());
+                parent->pOBDCharacteristic->notify(true);  // Force notify
+                Serial.println("BLE: Sent proactive greeting after MTU change");
+            }
         }
 
         void onDisconnect(NimBLEServer* pServer) {
