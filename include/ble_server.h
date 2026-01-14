@@ -487,19 +487,12 @@ public:
     void sendBLEResponse(const String& response) {
         if (!deviceConnected) return;
 
-        // Send to main OBD characteristic (supports both Notify and Indicate)
+        // Real Vgate adapter sends responses ONLY via main OBD characteristic's notify()
+        // (NOT indicate, NOT via custom service 0x2AF0)
+        // Sniffer showed 100% of responses via notification, zero via indication
         if (pOBDCharacteristic) {
             pOBDCharacteristic->setValue(response.c_str());
-            pOBDCharacteristic->notify();    // Fire-and-forget
-            pOBDCharacteristic->indicate();  // Requires acknowledgment
-        }
-
-        // Also send to Custom Service notify characteristic (0x2AF0)
-        // Real Vgate has both Notify and Indicate on this characteristic
-        if (pCustomNotifyCharacteristic) {
-            pCustomNotifyCharacteristic->setValue(response.c_str());
-            pCustomNotifyCharacteristic->notify();    // Fire-and-forget
-            pCustomNotifyCharacteristic->indicate();  // Requires acknowledgment
+            pOBDCharacteristic->notify();  // Send notification only
         }
     }
 
