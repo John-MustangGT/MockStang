@@ -33,6 +33,7 @@ private:
 
     NimBLEServer* pServer;
     NimBLECharacteristic* pOBDCharacteristic;
+    NimBLECharacteristic* pCustomNotifyCharacteristic;  // 0x2AF0 for Custom Service responses
 
     bool deviceConnected;
     bool oldDeviceConnected;
@@ -145,7 +146,8 @@ private:
 public:
     BLEOBDServer(PIDHandler* handler, ConfigManager* config, ELM327Protocol* elm)
         : pidHandler(handler), configManager(config), elm327(elm),
-          deviceConnected(false), oldDeviceConnected(false), connectedClients(0) {}
+          deviceConnected(false), oldDeviceConnected(false), connectedClients(0),
+          pOBDCharacteristic(nullptr), pCustomNotifyCharacteristic(nullptr) {}
 
     void begin() {
         Serial.println("Initializing BLE (Vgate/Vlinker Profile)...");
@@ -272,30 +274,49 @@ public:
         // ========================================
         NimBLEService* pCustomService = pServer->createService(NimBLEUUID((uint16_t)0x18F0));
 
-        // Callbacks to log any access to custom service
+        // Callbacks for custom service - process commands written to 0x2AF1
         class CustomCallbacks: public NimBLECharacteristicCallbacks {
+            BLEOBDServer* parent;
+        public:
+            CustomCallbacks(BLEOBDServer* p) : parent(p) {}
+
             void onRead(NimBLECharacteristic* pCharacteristic) {
                 Serial.printf("BLE: Custom Service Read - UUID: %s\n", pCharacteristic->getUUID().toString().c_str());
             }
+
             void onWrite(NimBLECharacteristic* pCharacteristic) {
-                std::string value = pCharacteristic->getValue();
+                std::string rxValue = pCharacteristic->getValue();
                 Serial.printf("BLE: Custom Service Write - UUID: %s, Data (%d bytes): ",
-                             pCharacteristic->getUUID().toString().c_str(), value.length());
-                for (uint8_t b : value) {
+                             pCharacteristic->getUUID().toString().c_str(), rxValue.length());
+                for (uint8_t b : rxValue) {
                     Serial.printf("0x%02X ", b);
                 }
                 Serial.println();
+
+                // Process commands from Custom Service the same way as OBD Service
+                // Handle incoming data
+                for (char c : rxValue) {
+                    // ELM327 uses \r as terminator
+                    if (c == '\r' || c == '\n') {
+                        if (parent->inputBuffer.length() > 0) {
+                            parent->processCommand(parent->inputBuffer);
+                            parent->inputBuffer = "";
+                        }
+                    } else if (c >= 32 && c < 127) {  // Printable characters
+                        parent->inputBuffer += c;
+                    }
+                }
             }
         };
 
-        // Characteristic 2AF1 [Write]
+        // Characteristic 2AF1 [Write] - Commands come here for some OBD apps
         NimBLECharacteristic* pCustomWrite = pCustomService->createCharacteristic(
             NimBLEUUID((uint16_t)0x2AF1), NIMBLE_PROPERTY::WRITE
         );
-        pCustomWrite->setCallbacks(new CustomCallbacks());
+        pCustomWrite->setCallbacks(new CustomCallbacks(this));
 
-        // Characteristic 2AF0 [Notify]
-        NimBLECharacteristic* pCustomNotify = pCustomService->createCharacteristic(
+        // Characteristic 2AF0 [Notify] - Responses go here for some OBD apps
+        pCustomNotifyCharacteristic = pCustomService->createCharacteristic(
             NimBLEUUID((uint16_t)0x2AF0), NIMBLE_PROPERTY::NOTIFY
         );
 
@@ -386,11 +407,21 @@ public:
             response = pidHandler->handleRequest(command);
         }
 
-        // Send response via BLE notification
-        if (deviceConnected && pOBDCharacteristic) {
-            // BLE can handle chunking automatically with MTU
-            pOBDCharacteristic->setValue(response.c_str());
-            pOBDCharacteristic->notify();
+        // Send response via BLE notification on BOTH characteristics
+        // Some apps use OBD service, some use Custom service
+        if (deviceConnected) {
+            // Send to main OBD characteristic
+            if (pOBDCharacteristic) {
+                pOBDCharacteristic->setValue(response.c_str());
+                pOBDCharacteristic->notify();
+            }
+
+            // Also send to Custom Service notify characteristic (0x2AF0)
+            // CarScanner and similar apps listen here
+            if (pCustomNotifyCharacteristic) {
+                pCustomNotifyCharacteristic->setValue(response.c_str());
+                pCustomNotifyCharacteristic->notify();
+            }
 
             #if ENABLE_SERIAL_LOGGING
                 Serial.printf("BLE RESP (%d bytes): ", response.length());
