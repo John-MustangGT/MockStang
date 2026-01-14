@@ -53,16 +53,7 @@ private:
             // Update connection parameters for lower latency
             pServer->updateConnParams(desc->conn_handle, 24, 48, 0, 60);
 
-            // Small delay to let connection stabilize
-            delay(100);
-
-            // Send initial ELM327 greeting (required by OBD apps)
-            if (parent->pOBDCharacteristic) {
-                String greeting = "ELM327 v1.5\r\r>";
-                parent->pOBDCharacteristic->setValue(greeting.c_str());
-                parent->pOBDCharacteristic->notify();
-                Serial.println("BLE: Sent greeting to client");
-            }
+            Serial.println("BLE: Waiting for client to subscribe to notifications...");
         }
 
         void onDisconnect(NimBLEServer* pServer) {
@@ -88,6 +79,21 @@ private:
             #if ENABLE_SERIAL_LOGGING
                 Serial.println("BLE characteristic read");
             #endif
+        }
+
+        void onSubscribe(NimBLECharacteristic* pCharacteristic, ble_gap_conn_desc* desc, uint16_t subValue) {
+            // Client has subscribed to notifications - send ELM327 greeting
+            if (subValue > 0) {
+                Serial.println("BLE: Client subscribed to notifications");
+                delay(100);  // Brief delay for stability
+
+                String greeting = "ELM327 v1.5\r\r>";
+                pCharacteristic->setValue(greeting.c_str());
+                pCharacteristic->notify();
+                Serial.println("BLE: Sent ELM327 greeting");
+            } else {
+                Serial.println("BLE: Client unsubscribed from notifications");
+            }
         }
 
         void onWrite(NimBLECharacteristic* pCharacteristic) {
