@@ -272,10 +272,21 @@ public:
         // ========================================
         NimBLEService* pCustomService = pServer->createService(NimBLEUUID((uint16_t)0x18F0));
 
+        // Callbacks to log any access to custom service
+        class CustomCallbacks: public NimBLECharacteristicCallbacks {
+            void onRead(NimBLECharacteristic* pCharacteristic) {
+                Serial.printf("BLE: Custom Service Read - UUID: %s\n", pCharacteristic->getUUID().toString().c_str());
+            }
+            void onWrite(NimBLECharacteristic* pCharacteristic) {
+                Serial.printf("BLE: Custom Service Write - UUID: %s\n", pCharacteristic->getUUID().toString().c_str());
+            }
+        };
+
         // Characteristic 2AF1 [Write]
         NimBLECharacteristic* pCustomWrite = pCustomService->createCharacteristic(
             NimBLEUUID((uint16_t)0x2AF1), NIMBLE_PROPERTY::WRITE
         );
+        pCustomWrite->setCallbacks(new CustomCallbacks());
 
         // Characteristic 2AF0 [Notify]
         NimBLECharacteristic* pCustomNotify = pCustomService->createCharacteristic(
@@ -300,6 +311,14 @@ public:
 
         // Set initial greeting value so it can be read immediately
         pOBDCharacteristic->setValue("ELM327 v1.5\r\r>");
+
+        // Explicitly create CCCD descriptor for notifications (should be automatic, but be explicit)
+        // This is required for clients to enable/disable notifications
+        NimBLE2902* pCCCD = (NimBLE2902*)pOBDCharacteristic->getDescriptorByUUID((uint16_t)0x2902);
+        if (!pCCCD) {
+            pOBDCharacteristic->createDescriptor((uint16_t)0x2902);
+            Serial.println("BLE: Explicitly created CCCD descriptor");
+        }
 
         pOBDService->start();
 
