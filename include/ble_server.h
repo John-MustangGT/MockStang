@@ -281,11 +281,11 @@ public:
         // ========================================
         NimBLEService* pOBDService = pServer->createService(BLE_SERVICE_UUID);
 
+        // Match real Vgate exactly: Read, Write, Notify (no Write_NR)
         pOBDCharacteristic = pOBDService->createCharacteristic(
             BLE_CHAR_UUID,
             NIMBLE_PROPERTY::READ |
             NIMBLE_PROPERTY::WRITE |
-            NIMBLE_PROPERTY::WRITE_NR |
             NIMBLE_PROPERTY::NOTIFY
         );
         pOBDCharacteristic->setCallbacks(new CharacteristicCallbacks(this));
