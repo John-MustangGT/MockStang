@@ -49,11 +49,18 @@ private:
             parent->deviceConnected = true;
             parent->connectedClients++;
             Serial.printf("BLE Client connected (total: %d)\n", parent->connectedClients);
+            Serial.printf("  Connection handle: %d\n", desc->conn_handle);
+            Serial.printf("  MTU: %d\n", pServer->getPeerMTU(desc->conn_handle));
 
             // Update connection parameters for lower latency
-            pServer->updateConnParams(desc->conn_handle, 24, 48, 0, 60);
+            int rc = pServer->updateConnParams(desc->conn_handle, 24, 48, 0, 60);
+            Serial.printf("  Connection params update: %s\n", rc == 0 ? "OK" : "FAILED");
 
             Serial.println("BLE: Waiting for client to subscribe to notifications...");
+        }
+
+        void onMTUChange(uint16_t MTU, ble_gap_conn_desc* desc) {
+            Serial.printf("BLE: MTU changed to %d\n", MTU);
         }
 
         void onDisconnect(NimBLEServer* pServer) {
@@ -65,6 +72,15 @@ private:
 
             // Clear input buffer on disconnect
             parent->inputBuffer = "";
+        }
+
+        uint32_t onPassKeyRequest() {
+            Serial.println("BLE: Passkey request (returning 0)");
+            return 0;
+        }
+
+        void onAuthenticationComplete(ble_gap_conn_desc* desc) {
+            Serial.printf("BLE: Authentication complete, status: %d\n", desc->sec_state.encrypted);
         }
     };
 
