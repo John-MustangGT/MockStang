@@ -11,6 +11,13 @@
 #include <Arduino.h>
 #include <NimBLEDevice.h>
 
+#ifdef HAS_NEOPIXEL
+    #include <Adafruit_NeoPixel.h>
+    #define NEOPIXEL_PIN 0     // Huzzah32 Feather V2 NeoPixel pin
+    #define NEOPIXEL_COUNT 1
+    Adafruit_NeoPixel pixel(NEOPIXEL_COUNT, NEOPIXEL_PIN, NEO_GRB + NEO_KHZ800);
+#endif
+
 // Target device to connect to
 #define TARGET_DEVICE_NAME "IOS-Vlink"
 
@@ -40,6 +47,60 @@ const char* testCommands[] = {
     "0100\r",
     nullptr
 };
+
+// NeoPixel status colors
+#ifdef HAS_NEOPIXEL
+enum StatusColor {
+    OFF = 0,
+    SCANNING = 1,      // Blue blinking
+    TARGET_FOUND = 2,  // Yellow
+    CONNECTING = 3,    // Purple
+    CONNECTED = 4,     // Green
+    SENDING_CMD = 5,   // Cyan blinking
+    ERROR_STATE = 6    // Red
+};
+
+void setStatus(StatusColor status) {
+    switch (status) {
+        case OFF:
+            pixel.setPixelColor(0, pixel.Color(0, 0, 0));
+            break;
+        case SCANNING:
+            pixel.setPixelColor(0, pixel.Color(0, 0, 50));  // Blue
+            break;
+        case TARGET_FOUND:
+            pixel.setPixelColor(0, pixel.Color(50, 50, 0));  // Yellow
+            break;
+        case CONNECTING:
+            pixel.setPixelColor(0, pixel.Color(50, 0, 50));  // Purple
+            break;
+        case CONNECTED:
+            pixel.setPixelColor(0, pixel.Color(0, 50, 0));  // Green
+            break;
+        case SENDING_CMD:
+            pixel.setPixelColor(0, pixel.Color(0, 50, 50));  // Cyan
+            break;
+        case ERROR_STATE:
+            pixel.setPixelColor(0, pixel.Color(50, 0, 0));  // Red
+            break;
+    }
+    pixel.show();
+}
+
+void blinkStatus(StatusColor color, int times = 1) {
+    for (int i = 0; i < times; i++) {
+        setStatus(color);
+        delay(100);
+        setStatus(OFF);
+        delay(100);
+    }
+    setStatus(color);
+}
+#else
+    // Stub functions when NeoPixel not available
+    #define setStatus(x) do {} while(0)
+    #define blinkStatus(x, y) do {} while(0)
+#endif
 
 // Helper: Print hex dump of data
 void hexDump(const char* label, const uint8_t* data, size_t len) {
@@ -77,12 +138,14 @@ class ClientCallbacks : public NimBLEClientCallbacks {
     void onConnect(NimBLEClient* pClient) {
         Serial.println("\n=== CONNECTED TO DEVICE ===");
         connected = true;
+        setStatus(CONNECTED);
     }
 
     void onDisconnect(NimBLEClient* pClient) {
         Serial.println("\n=== DISCONNECTED FROM DEVICE ===");
         connected = false;
         servicesDiscovered = false;
+        setStatus(ERROR_STATE);
         Serial.println("\nRestarting scan in 5 seconds...");
     }
 };
@@ -96,6 +159,8 @@ class AdvertisedDeviceCallbacks: public NimBLEAdvertisedDeviceCallbacks {
             Serial.println(" <<< TARGET FOUND!");
             Serial.printf("  Address: %s\n", advertisedDevice->getAddress().toString().c_str());
             Serial.printf("  RSSI: %d dBm\n", advertisedDevice->getRSSI());
+
+            setStatus(TARGET_FOUND);
 
             // Show advertised services
             if (advertisedDevice->haveServiceUUID()) {
@@ -116,6 +181,7 @@ class AdvertisedDeviceCallbacks: public NimBLEAdvertisedDeviceCallbacks {
 
 bool connectToServer() {
     Serial.println("\n=== ATTEMPTING CONNECTION ===");
+    setStatus(CONNECTING);
 
     pClient = NimBLEDevice::createClient();
     pClient->setClientCallbacks(new ClientCallbacks(), false);
@@ -123,6 +189,7 @@ bool connectToServer() {
 
     if (!pClient->connect(targetDevice)) {
         Serial.println("ERROR: Failed to connect");
+        setStatus(ERROR_STATE);
         NimBLEDevice::deleteClient(pClient);
         pClient = nullptr;
         return false;
@@ -203,6 +270,8 @@ void sendCommand(const char* cmd) {
     Serial.printf("\n>>> SENDING COMMAND <<<\n");
     hexDump("Command", (const uint8_t*)cmd, len);
 
+    blinkStatus(SENDING_CMD, 2);
+
     bool sent = false;
 
     // Try Custom Service first (this is what OBD apps seem to prefer)
@@ -234,6 +303,8 @@ void sendCommand(const char* cmd) {
     // Wait for response
     Serial.println("Waiting for response...");
     delay(500);  // Give adapter time to respond
+
+    setStatus(CONNECTED);  // Return to connected (green) status
 }
 
 void runCommandSequence() {
@@ -275,6 +346,23 @@ void setup() {
     Serial.printf("Target device: %s\n", TARGET_DEVICE_NAME);
     Serial.println();
 
+#ifdef HAS_NEOPIXEL
+    Serial.println("Initializing NeoPixel...");
+    pixel.begin();
+    pixel.setBrightness(50);
+    setStatus(OFF);
+    delay(500);
+    blinkStatus(SCANNING, 3);  // Blink blue 3 times on startup
+    Serial.println("NeoPixel Status Guide:");
+    Serial.println("  Blue blinking: Scanning for adapter");
+    Serial.println("  Yellow: Target found");
+    Serial.println("  Purple: Connecting");
+    Serial.println("  Green: Connected");
+    Serial.println("  Cyan blinking: Sending commands");
+    Serial.println("  Red: Error/Disconnected");
+    Serial.println();
+#endif
+
     Serial.println("Initializing NimBLE...");
     NimBLEDevice::init("MockStang-Sniffer");
     NimBLEDevice::setPower(ESP_PWR_LVL_P9);
@@ -288,10 +376,26 @@ void setup() {
     pScan->start(0, false);  // Scan continuously until target found
 
     Serial.println("Scanning for IOS-Vlink adapter...");
+    setStatus(SCANNING);
 }
 
 void loop() {
     static bool commandsSent = false;
+    static unsigned long lastBlink = 0;
+    static bool ledState = false;
+
+    // Blink LED while scanning
+    if (!connected && !doConnect && !commandsSent) {
+        if (millis() - lastBlink > 500) {
+            ledState = !ledState;
+            if (ledState) {
+                setStatus(SCANNING);
+            } else {
+                setStatus(OFF);
+            }
+            lastBlink = millis();
+        }
+    }
 
     if (doConnect) {
         doConnect = false;
@@ -299,6 +403,7 @@ void loop() {
             Serial.println("\nConnection successful!");
         } else {
             Serial.println("\nConnection failed, restarting scan...");
+            setStatus(SCANNING);
             NimBLEDevice::getScan()->start(0, false);
         }
     }
@@ -314,8 +419,9 @@ void loop() {
         commandsSent = false;
         delay(5000);
         Serial.println("Restarting scan...");
+        setStatus(SCANNING);
         NimBLEDevice::getScan()->start(0, false);
     }
 
-    delay(1000);
+    delay(100);
 }
