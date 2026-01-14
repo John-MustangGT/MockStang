@@ -20,10 +20,10 @@
 #define WEB_SERVER_PORT 80
 
 // ELM327 Protocol Settings
-#define ELM_DEVICE_DESC "ELM327 v1.5"
+#define ELM_DEVICE_DESC "ELM327 v2.1"  // Match real Vgate iCar2 version
 // Use Vgate-compatible device ID for OBD app recognition
 #define ELM_DEVICE_ID "OBDII to RS232 Interpreter"
-#define ELM_VOLTAGE "12.8V"  // Simulated car voltage
+#define ELM_VOLTAGE "11.8V"  // Typical car accessory voltage (match real adapter)
 
 // Serial Debugging
 #define ENABLE_SERIAL_LOGGING true  // Enable/disable CMD/RESP logging to serial

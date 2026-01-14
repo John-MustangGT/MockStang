@@ -28,7 +28,7 @@ public:
     }
 
     void reset() {
-        echo = false;  // BLE adapters typically default to echo OFF
+        echo = true;  // Real Vgate iCar2 defaults to echo ON
         headers = false;
         spaces = true;
         linefeed = true;
@@ -56,7 +56,7 @@ public:
             // Reset
             reset();
             delay(100);
-            return response + "ELM327 v1.5\r\r>";
+            return response + ELM_DEVICE_DESC "\r\r>";
         }
         else if (cmd == "ATI" || cmd == "AT I") {
             // Device info - returns device identifier
@@ -67,8 +67,8 @@ public:
             return response + ELM_DEVICE_DESC "\r\r>";
         }
         else if (cmd == "AT@2") {
-            // Device identifier (same as ATI)
-            return response + ELM_DEVICE_ID "\r\r>";
+            // Not supported by real Vgate iCar2 - return error
+            return response + "?\r\r>";
         }
         else if (cmd == "ATRV") {
             // Read voltage
