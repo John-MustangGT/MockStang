@@ -32,10 +32,24 @@
     #define PLATFORM_NAME "ESP32-S3 Feather"
     #define PLATFORM_SHORT "ESP32S3"
 
-    // Feature availability
-    #define ENABLE_BLE true
-    #define ENABLE_DISPLAY true
-    #define HAS_PSRAM true
+    // Feature availability - controlled by build flags in platformio.ini
+    #if defined(WIFI_AND_BLE)
+        #define ENABLE_BLE true
+    #else
+        #define ENABLE_BLE false
+    #endif
+
+    #if defined(HAS_DISPLAY)
+        #define ENABLE_DISPLAY true
+    #else
+        #define ENABLE_DISPLAY false
+    #endif
+
+    #if defined(BOARD_HAS_PSRAM)
+        #define HAS_PSRAM true
+    #else
+        #define HAS_PSRAM false
+    #endif
 
     // Resource limits (generous)
     #define MAX_CONNECTIONS 4
