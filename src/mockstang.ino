@@ -1,5 +1,21 @@
-#include <ESP8266WiFi.h>
+#include <Arduino.h>
 #include "config.h"
+
+// Platform-specific WiFi includes
+#ifdef ESP01_BUILD
+    #include <ESP8266WiFi.h>
+    #include <ESPAsyncTCP.h>
+#elif defined(ESP32_BUILD)
+    #include <WiFi.h>
+    #include <AsyncTCP.h>
+    #if ENABLE_BLE
+        #include "ble_server.h"
+    #endif
+    #if ENABLE_DISPLAY
+        #include "display_manager.h"
+    #endif
+#endif
+
 #include "elm327_protocol.h"
 #include "pid_handler.h"
 #include "web_server.h"
@@ -15,16 +31,35 @@ PIDHandler* pidHandler;
 WebServer* webServer;
 ConfigManager* configManager;
 
+#if ENABLE_BLE
+    BLEOBDServer* bleServer;
+#endif
+
+#if ENABLE_DISPLAY
+    DisplayManager* display;
+#endif
+
 // Client connection state
 bool clientConnected = false;
 String inputBuffer = "";
+
+// State broadcast timing
+unsigned long lastStateBroadcast = 0;
+#define STATE_BROADCAST_INTERVAL 200  // Broadcast state every 200ms during driving simulation
+
+// Stats broadcast timing
+unsigned long lastStatsBroadcast = 0;
+#define STATS_BROADCAST_INTERVAL 1000  // Broadcast stats every 1 second
 
 void setup() {
     Serial.begin(115200);
     delay(100);
 
     Serial.println("\n\n=================================");
-    Serial.println("MockStang - WiFi OBD-II Emulator");
+    Serial.printf("MockStang - OBD-II Emulator (%s)\n", PLATFORM_NAME);
+    #ifdef GIT_COMMIT_HASH
+        Serial.printf("Build: %s @ %s\n", GIT_COMMIT_HASH, BUILD_TIMESTAMP);
+    #endif
     Serial.println("=================================\n");
 
     // Load configuration from EEPROM
@@ -44,6 +79,13 @@ void setup() {
     pidHandler->updateMAF(configManager->getDefaultMAF());
     pidHandler->updateFuelLevel(configManager->getDefaultFuelLevel());
     pidHandler->updateBarometric(configManager->getDefaultBarometric());
+
+    #if ENABLE_DISPLAY
+        // Initialize TFT display (ESP32 only)
+        display = new DisplayManager(pidHandler);
+        display->begin();
+        display->showSplash();
+    #endif
 
     // Generate SSID (either custom or MAC-based)
     WiFi.mode(WIFI_AP);
@@ -85,6 +127,12 @@ void setup() {
     // Start web server
     webServer->begin();
 
+    #if ENABLE_BLE
+        // Initialize BLE server (ESP32 only)
+        bleServer = new BLEOBDServer(pidHandler, configManager, &elm327);
+        bleServer->begin();
+    #endif
+
     Serial.println("\n=================================");
     Serial.println("System Ready!");
     Serial.printf("Connect to WiFi: %s\n", ssid);
@@ -96,6 +144,16 @@ void setup() {
 void loop() {
     // Handle web server
     webServer->loop();
+
+    #if ENABLE_BLE
+        // Handle BLE connections
+        bleServer->loop();
+    #endif
+
+    #if ENABLE_DISPLAY
+        // Update display
+        display->update();
+    #endif
 
     // Check for new ELM327 client connections
     if (elm327Server.hasClient()) {
@@ -112,6 +170,9 @@ void loop() {
                 inputBuffer = "";
                 Serial.printf("ELM327 client connected from %s\n",
                              elm327Client.remoteIP().toString().c_str());
+
+                // Track connection statistics
+                webServer->trackConnection(elm327Client.remoteIP().toString());
 
                 // Send initial prompt
                 elm327Client.print("ELM327 v1.5\r\r>");
@@ -146,6 +207,9 @@ void loop() {
         elm327Client.stop();
         clientConnected = false;
         inputBuffer = "";
+
+        // Track disconnection
+        webServer->trackDisconnection();
     }
 
     // Handle WebSocket messages for parameter updates
@@ -159,6 +223,22 @@ void loop() {
     // Update driving simulator
     pidHandler->updateDrivingSimulator();
 
+    // Broadcast state updates during driving simulation
+    if (pidHandler->getDriveMode() != DRIVE_OFF) {
+        unsigned long now = millis();
+        if (now - lastStateBroadcast >= STATE_BROADCAST_INTERVAL) {
+            webServer->broadcastState(pidHandler->getState());
+            lastStateBroadcast = now;
+        }
+    }
+
+    // Broadcast connection statistics periodically
+    unsigned long now = millis();
+    if (now - lastStatsBroadcast >= STATS_BROADCAST_INTERVAL) {
+        webServer->broadcastStats();
+        lastStatsBroadcast = now;
+    }
+
     delay(1);  // Small delay to prevent watchdog timer issues
 }
 
@@ -169,7 +249,12 @@ void processCommand(String command) {
         return;
     }
 
-    Serial.printf("CMD: %s\n", command.c_str());
+    // Track command statistics
+    webServer->trackCommand(command);
+
+    #if ENABLE_SERIAL_LOGGING
+        Serial.printf("CMD: %s\n", command.c_str());
+    #endif
 
     String response;
 
@@ -186,7 +271,12 @@ void processCommand(String command) {
     // Send response to client
     elm327Client.print(response);
 
-    Serial.printf("RESP: %s\n", response.c_str());
+    // Track response
+    webServer->trackResponse();
+
+    #if ENABLE_SERIAL_LOGGING
+        Serial.printf("RESP: %s\n", response.c_str());
+    #endif
 
     // Broadcast to web interface
     webServer->broadcastOBDActivity(command, response);

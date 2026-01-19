@@ -39,6 +39,54 @@ button:hover{background:#ff8555}
 </div>
 
 <div class="card">
+<h3>📊 Connection Statistics</h3>
+<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:15px;margin-top:10px">
+<div style="background:#1a1a1a;padding:10px;border-radius:4px">
+<div style="font-size:11px;color:#888;margin-bottom:5px">OBD Client</div>
+<div style="font-size:14px;font-weight:bold;color:#4a9eff" id="statsClientStatus">Disconnected</div>
+<div style="font-size:11px;color:#666;margin-top:3px" id="statsClientIP">--</div>
+</div>
+<div style="background:#1a1a1a;padding:10px;border-radius:4px">
+<div style="font-size:11px;color:#888;margin-bottom:5px">Uptime</div>
+<div style="font-size:14px;font-weight:bold;color:#4a9eff" id="statsUptime">0s</div>
+</div>
+<div style="background:#1a1a1a;padding:10px;border-radius:4px">
+<div style="font-size:11px;color:#888;margin-bottom:5px">Total Commands</div>
+<div style="font-size:14px;font-weight:bold;color:#4a9eff" id="statsTotalCommands">0</div>
+</div>
+<div style="background:#1a1a1a;padding:10px;border-radius:4px">
+<div style="font-size:11px;color:#888;margin-bottom:5px">Commands/Min</div>
+<div style="font-size:14px;font-weight:bold;color:#4a9eff" id="statsCommandsPerMin">0</div>
+</div>
+</div>
+<div style="margin-top:15px;background:#1a1a1a;padding:10px;border-radius:4px">
+<div style="font-size:11px;color:#888;margin-bottom:8px">Command Breakdown</div>
+<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;text-align:center">
+<div>
+<div style="font-size:18px;font-weight:bold;color:#4a9eff" id="statsMode01">0</div>
+<div style="font-size:10px;color:#666">Mode 01</div>
+</div>
+<div>
+<div style="font-size:18px;font-weight:bold;color:#4a9eff" id="statsMode03">0</div>
+<div style="font-size:10px;color:#666">Mode 03</div>
+</div>
+<div>
+<div style="font-size:18px;font-weight:bold;color:#4a9eff" id="statsMode09">0</div>
+<div style="font-size:10px;color:#666">Mode 09</div>
+</div>
+<div>
+<div style="font-size:18px;font-weight:bold;color:#4a9eff" id="statsAT">0</div>
+<div style="font-size:10px;color:#666">AT Cmds</div>
+</div>
+</div>
+</div>
+<div style="margin-top:10px;padding:8px;background:#1a1a1a;border-radius:4px">
+<div style="font-size:10px;color:#888">Last Command:</div>
+<div style="font-size:11px;color:#4a9eff;font-family:monospace;margin-top:3px" id="statsLastCommand">--</div>
+</div>
+</div>
+
+<div class="card">
 <h3>🚗 Driving Simulator</h3>
 <p style="color:#aaa;margin:10px 0">Automatically animate vehicle parameters</p>
 <div style="display:flex;gap:10px;flex-wrap:wrap">
@@ -146,6 +194,53 @@ function initWebSocket(){
     var log=document.getElementById('log');
     var msg=JSON.parse(e.data);
     var now=new Date().toLocaleTimeString();
+
+    // Handle state updates from driving simulator
+    if(msg.type==='state'){
+      document.getElementById('rpm').value=msg.rpm;
+      document.getElementById('rpmVal').innerText=msg.rpm;
+      document.getElementById('speed').value=msg.speed;
+      document.getElementById('speedVal').innerText=msg.speed;
+      document.getElementById('coolant').value=msg.coolant;
+      document.getElementById('coolantVal').innerText=msg.coolant;
+      document.getElementById('intake').value=msg.intake;
+      document.getElementById('intakeVal').innerText=msg.intake;
+      document.getElementById('throttle').value=msg.throttle;
+      document.getElementById('throttleVal').innerText=msg.throttle;
+      document.getElementById('maf').value=msg.maf;
+      document.getElementById('mafVal').innerText=(msg.maf/100).toFixed(2);
+      document.getElementById('fuel').value=msg.fuel;
+      document.getElementById('fuelVal').innerText=msg.fuel;
+      document.getElementById('baro').value=msg.baro;
+      document.getElementById('baroVal').innerText=msg.baro;
+      return;
+    }
+
+    // Handle connection statistics updates
+    if(msg.type==='stats'){
+      document.getElementById('statsClientStatus').innerText=msg.clientConnected?'Connected':'Disconnected';
+      document.getElementById('statsClientStatus').style.color=msg.clientConnected?'#4ade80':'#888';
+      document.getElementById('statsClientIP').innerText=msg.clientIP||'--';
+
+      // Format uptime
+      var uptime=msg.uptime;
+      var hours=Math.floor(uptime/3600);
+      var mins=Math.floor((uptime%3600)/60);
+      var secs=uptime%60;
+      var uptimeStr=hours>0?(hours+'h '+mins+'m'):(mins>0?(mins+'m '+secs+'s'):(secs+'s'));
+      document.getElementById('statsUptime').innerText=uptimeStr;
+
+      document.getElementById('statsTotalCommands').innerText=msg.totalCommands;
+      document.getElementById('statsCommandsPerMin').innerText=msg.commandsPerMinute;
+      document.getElementById('statsMode01').innerText=msg.mode01Count;
+      document.getElementById('statsMode03').innerText=msg.mode03Count;
+      document.getElementById('statsMode09').innerText=msg.mode09Count;
+      document.getElementById('statsAT').innerText=msg.atCommandCount;
+      document.getElementById('statsLastCommand').innerText=msg.lastCommand||'--';
+      return;
+    }
+
+    // Handle command/response logs
     if(msg.cmd){
       log.innerHTML+='<span class="log-time">['+now+']</span> <span class="log-cmd">← '+msg.cmd+'</span><br>';
     }

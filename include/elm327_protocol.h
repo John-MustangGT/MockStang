@@ -28,12 +28,16 @@ public:
     }
 
     void reset() {
-        echo = true;
+        echo = true;  // Real Vgate iCar2 defaults to echo ON
         headers = false;
         spaces = true;
         linefeed = true;
         protocol = 0;  // Auto
         timeout = 200;
+    }
+
+    bool isEchoEnabled() const {
+        return echo;
     }
 
     // Parse AT command and return response
@@ -56,19 +60,19 @@ public:
             // Reset
             reset();
             delay(100);
-            return response + "ELM327 v1.5\r\r>";
-        }
-        else if (cmd == "ATI" || cmd == "AT I") {
-            // Device info
             return response + ELM_DEVICE_DESC "\r\r>";
         }
-        else if (cmd == "AT@1") {
-            // Device description
+        else if (cmd == "ATI" || cmd == "AT I") {
+            // Device info - returns device identifier
             return response + ELM_DEVICE_ID "\r\r>";
         }
+        else if (cmd == "AT@1") {
+            // Device description - returns version string
+            return response + ELM_DEVICE_DESC "\r\r>";
+        }
         else if (cmd == "AT@2") {
-            // Device identifier (often same as @1)
-            return response + ELM_DEVICE_ID "\r\r>";
+            // Not supported by real Vgate iCar2 - return error
+            return response + "?\r\r>";
         }
         else if (cmd == "ATRV") {
             // Read voltage

@@ -7,7 +7,7 @@ This document tracks potential features and enhancements for MockStang.
 - [x] ELM327 v1.5 protocol emulation
 - [x] WiFi AP mode with vGate iCar Pro compatibility
 - [x] Web dashboard with real-time parameter control
-- [x] Mode 01 (Current Data) - 11 PIDs
+- [x] Mode 01 (Current Data) - 27 PIDs (expanded from 11)
 - [x] Mode 03 (Read DTCs)
 - [x] Mode 04 (Clear DTCs)
 - [x] Mode 07 (Pending DTCs)
@@ -15,15 +15,20 @@ This document tracks potential features and enhancements for MockStang.
 - [x] MIL (Check Engine Light) management
 - [x] DTC storage and management (up to 8 codes)
 - [x] EEPROM configuration persistence
-- [x] Multi-device support (2 simultaneous connections)
+- [x] Multi-device support (2 simultaneous connections on ESP-01S, 4 on ESP32-S3)
 - [x] WebSocket for real-time updates
+- [x] **Driving Simulator** with 4 aggressiveness levels (GENTLE, NORMAL, SPORT, DRAG)
+- [x] **Live Dashboard Updates** - Sliders automatically update during driving simulation
+- [x] **Connection Statistics Dashboard** - Real-time monitoring of OBD-II app behavior
+- [x] **Optional Serial Logging** - Configurable CMD/RESP logging
+- [x] **Multi-Platform Support** - ESP-01S (WiFi) and ESP32-S3 (WiFi+BLE+Display)
+- [x] **BLE Peripheral Mode** - Bluetooth Low Energy support (ESP32-S3)
+- [x] **TFT Display Support** - Real-time parameter visualization (ESP32-S3)
+- [x] **Expanded Mode 01 PIDs** - Fuel trim, timing advance, MAP, O2 sensors, battery voltage, oil temp, etc.
 
 ## 🚧 In Progress
 
-- [ ] **Driving Simulator** (High Priority)
-  - Automated parameter changes simulating real driving
-  - Multiple aggressiveness levels (gentle, normal, sport, drag race)
-  - Realistic transitions and constraints
+- [ ] None currently
 
 ## 📋 Planned Features
 
@@ -44,17 +49,6 @@ Presets:
 - **Fault Condition**: MIL on with P0420 catalyst efficiency code
 - **Multiple Faults**: Several DTCs active (P0171, P0174, P0300)
 
-#### Additional Mode 01 PIDs
-**Value**: Better compatibility with OBD apps
-**Effort**: Low
-**Missing PIDs**:
-- `0x06`: Short term fuel trim
-- `0x07`: Long term fuel trim
-- `0x0E`: Timing advance
-- `0x42`: Control module voltage
-- `0x46`: Ambient air temperature
-- `0x51`: Fuel type
-
 ### Medium Priority
 
 #### Freeze Frame Data (Mode 02)
@@ -70,16 +64,6 @@ Presets:
 - Import predefined vehicle profiles
 - Built-in profiles for different vehicle types (sedan, truck, sports car)
 - Share test scenarios between developers
-
-#### Connection Statistics Dashboard
-**Value**: Performance testing and debugging
-**Effort**: Low
-**Metrics**:
-- Commands per second
-- Connection duration
-- Most queried PIDs
-- Average response time
-- Total commands processed
 
 #### Response Delay Simulation
 **Value**: Test app behavior with slow/unreliable adapters
@@ -142,7 +126,6 @@ Presets:
 ## 💡 Ideas for Future Consideration
 
 - **Mobile App**: Native iOS/Android app for remote control
-- **Bluetooth Support**: Classic Bluetooth or BLE mode
 - **Cloud Sync**: Share configurations across devices
 - **Scripting Engine**: Lua or JavaScript for custom scenarios
 - **Multi-ECU Simulation**: Simulate multiple ECUs on different CAN IDs
@@ -165,5 +148,5 @@ If you implement any of these features or have suggestions for new ones, please:
 
 ---
 
-**Last Updated**: 2026-01-12
-**Project**: MockStang WiFi OBD-II Emulator
+**Last Updated**: 2026-01-13
+**Project**: MockStang WiFi/BLE OBD-II Emulator
